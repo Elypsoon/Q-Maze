@@ -20,7 +20,7 @@ export default class GameScene extends Phaser.Scene {
     
     // Temporizadores
     this.totalTimeLimit = 300; // 5 minutos en segundos
-    this.questionTimeInterval = 20; // Cada 20 segundos lanza pregunta (aumentado de 20)
+    this.questionTimeInterval = 20; // Cada 20 segundos lanza pregunta
     this.timeElapsed = 0;
     this.timeSinceLastQuestion = 0;
     
@@ -30,6 +30,10 @@ export default class GameScene extends Phaser.Scene {
     this.questionActive = false;
     this.invulnerable = false; // Estado de invulnerabilidad
     this.isPaused = false; // Estado de pausa
+    
+    // Sistema de puntos basado en progreso
+    this.visitedCells = new Set(); // Celdas visitadas para no contar dos veces
+    this.bestDistance = Infinity; // Mejor distancia a la meta
   }
 
   create() {
@@ -457,9 +461,25 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
-      // Usar configuración del servidor (futuro)
-      this.score += GAME_CONFIG.POINTS_COMPLETE_MAZE;
-      this.endGame(true, '¡Felicidades! ¡Completaste el laberinto!');
+      // Bonificación por completar el laberinto
+      this.score += GAME_CONFIG.COMPLETION_BONUS;
+      
+      // Bonificación por tiempo restante
+      const timeLeft = this.totalTimeLimit - this.timeElapsed;
+      const timeBonus = timeLeft * GAME_CONFIG.POINTS_PER_SECOND_LEFT;
+      this.score += timeBonus;
+      
+      // Bonificación por vidas restantes
+      const lifeBonus = this.lives * GAME_CONFIG.POINTS_PER_LIFE_LEFT;
+      this.score += lifeBonus;
+      
+      // Mensaje con detalles de bonificaciones
+      const bonusDetails = `\n\n🎯 Bonificaciones:\n` +
+        `Completar: +${GAME_CONFIG.COMPLETION_BONUS} pts\n` +
+        `Tiempo restante (${timeLeft}s): +${timeBonus} pts\n` +
+        `Vidas restantes (${this.lives}): +${lifeBonus} pts`;
+      
+      this.endGame(true, '¡Felicidades! ¡Completaste el laberinto!' + bonusDetails);
     }
   }
 
@@ -483,9 +503,7 @@ export default class GameScene extends Phaser.Scene {
     this.scene.resume();
 
     if (correct) {
-      // Usar configuración del servidor (futuro)
-      this.score += GAME_CONFIG.POINTS_CORRECT_ANSWER;
-      this.showFeedback(`¡Correcto! +${GAME_CONFIG.POINTS_CORRECT_ANSWER} puntos`, 0x2ecc71);
+      this.showFeedback('¡Correcto! Conservas tus vidas', 0x2ecc71);
     } else {
       this.lives--;
       this.showFeedback('¡Incorrecto! -1 vida', 0xe74c3c);
@@ -555,17 +573,18 @@ export default class GameScene extends Phaser.Scene {
     const finalMessage = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.centerY,
-      message + '\n\n' +
-      `Puntuación final: ${this.score}\n` +
+      message + '\n' +
+      `Puntuación final: ${this.score} pts\n` +
       `Tiempo usado: ${Math.floor(this.timeElapsed)}s\n\n` +
       'Presiona ESPACIO para volver al menú',
       {
-        fontSize: '28px',
+        fontSize: '24px',
         fontFamily: 'Arial Black',
         color: '#ffffff',
         backgroundColor: won ? '#27ae60' : '#c0392b',
         padding: { x: 20, y: 20 },
-        align: 'center'
+        align: 'center',
+        lineSpacing: 8
       }
     );
     finalMessage.setOrigin(0.5);
@@ -772,6 +791,60 @@ export default class GameScene extends Phaser.Scene {
     this.scene.start('MenuScene');
   }
 
+  calculateManhattanDistance(x1, y1, x2, y2) {
+    return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+  }
+
+  getCurrentCell() {
+    // Calcular en qué celda está el jugador
+    const col = Math.floor((this.player.x - this.mazeOffsetX) / this.cellSize);
+    const row = Math.floor((this.player.y - this.mazeOffsetY) / this.cellSize);
+    return { row, col };
+  }
+
+  updateProgressScore() {
+    if (this.gameOver) return;
+    
+    const currentCell = this.getCurrentCell();
+    const cellKey = `${currentCell.row},${currentCell.col}`;
+    
+    // Verificar que la celda es válida
+    if (currentCell.row < 0 || currentCell.row >= this.mazeRows || 
+        currentCell.col < 0 || currentCell.col >= this.mazeCols) {
+      return;
+    }
+    
+    // Marcar celda como visitada
+    this.visitedCells.add(cellKey);
+    
+    // Calcular distancia Manhattan a la meta (esquina inferior derecha)
+    const goalRow = this.mazeRows - 1;
+    const goalCol = this.mazeCols - 1;
+    const currentDistance = this.calculateManhattanDistance(
+      currentCell.row, currentCell.col, 
+      goalRow, goalCol
+    );
+    
+    // Si es la mejor distancia hasta ahora, actualizar puntos
+    if (currentDistance < this.bestDistance) {
+      // Calcular distancia máxima posible (desde inicio a meta)
+      const maxDistance = this.calculateManhattanDistance(0, 0, goalRow, goalCol);
+      
+      // Calcular progreso (0 = inicio, 1 = meta)
+      const progress = 1 - (currentDistance / maxDistance);
+      
+      // Calcular puntos basados en progreso (máximo 800)
+      const newScore = Math.floor(progress * GAME_CONFIG.MAX_PROGRESS_POINTS);
+      
+      // Solo actualizar si aumentó
+      if (newScore > this.score) {
+        this.score = newScore;
+        this.bestDistance = currentDistance;
+        this.updateUI();
+      }
+    }
+  }
+
   update(time, delta) {
     // Verificar tecla de pausa
     if (Phaser.Input.Keyboard.JustDown(this.pauseKey) || Phaser.Input.Keyboard.JustDown(this.pauseKeyP)) {
@@ -783,6 +856,9 @@ export default class GameScene extends Phaser.Scene {
       this.player.body.setVelocity(0);
       return;
     }
+    
+    // Actualizar puntos basados en progreso
+    this.updateProgressScore();
 
     // Movimiento del jugador
     const speed = 150;

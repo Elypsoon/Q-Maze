@@ -72,11 +72,11 @@ export default class MenuScene extends Phaser.Scene {
     // Instrucciones
     const instrSize = Math.min(18, width / 55);
     const instructions = this.add.text(width / 2, height * 0.65, 
-      'Controles: ← ↑ → ↓ para moverte\n\n' +
-      '• Evita tocar las paredes\n' +
-      '• Pisa las zonas especiales de preguntas\n' +
-      '• Responde correctamente para conservar tus vidas\n' +
-      '• Tienes 3 vidas y tiempo límite\n', {
+      'Controles: ← ↑ → ↓ para moverte | ESC/P para pausar\n\n' +
+      '• Gana puntos al avanzar hacia la meta (máx. 800)\n' +
+      '• Responde preguntas para conservar vidas\n' +
+      '• Bonificaciones al completar: tiempo y vidas restantes\n' +
+      '• ¡Completa el laberinto rápido para máxima puntuación!', {
       fontSize: instrSize + 'px',
       fontFamily: 'Arial',
       color: '#95a5a6',

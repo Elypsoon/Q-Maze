@@ -3,9 +3,13 @@ import Phaser from 'phaser';
 // Configuración del juego (TODO: mover al backend en el futuro)
 export const GAME_CONFIG = {
   QUESTION_TIME_LIMIT: 10, // Segundos para responder cada pregunta
-  POINTS_CORRECT_ANSWER: 50, // Puntos por respuesta correcta
-  POINTS_COMPLETE_MAZE: 500, // Puntos por completar el laberinto
-  INVULNERABILITY_DURATION: 1000 // Duración de invulnerabilidad en ms (1 segundo)
+  INVULNERABILITY_DURATION: 1000, // Duración de invulnerabilidad en ms (1 segundo)
+  
+  // Sistema de puntos basado en progreso
+  MAX_PROGRESS_POINTS: 800, // Puntos máximos por avanzar en el laberinto
+  COMPLETION_BONUS: 200, // Bonificación por llegar a la meta
+  POINTS_PER_SECOND_LEFT: 2, // Puntos por cada segundo restante
+  POINTS_PER_LIFE_LEFT: 150 // Puntos por cada vida restante
 };
 
 // Banco de preguntas temporal (esto luego vendrá del backend)

@@ -1,5 +1,13 @@
 import Phaser from 'phaser';
 
+// Configuración del juego (TODO: mover al backend en el futuro)
+export const GAME_CONFIG = {
+  QUESTION_TIME_LIMIT: 10, // Segundos para responder cada pregunta
+  POINTS_CORRECT_ANSWER: 50, // Puntos por respuesta correcta
+  POINTS_COMPLETE_MAZE: 500, // Puntos por completar el laberinto
+  INVULNERABILITY_DURATION: 1000 // Duración de invulnerabilidad en ms (1 segundo)
+};
+
 // Banco de preguntas temporal (esto luego vendrá del backend)
 const QUESTION_BANK = [
   {
@@ -74,16 +82,38 @@ export default class QuestionScene extends Phaser.Scene {
     this.onAnswerCallback = data.onAnswer;
     this.selectedOption = -1;
     this.answered = false;
+    
+    // Configuración de tiempo desde el config (futuro: desde el servidor)
+    this.timeLimit = GAME_CONFIG.QUESTION_TIME_LIMIT;
+    this.timeLeft = this.timeLimit;
 
     // Seleccionar pregunta aleatoria
     this.currentQuestion = QUESTION_BANK[Math.floor(Math.random() * QUESTION_BANK.length)];
   }
 
   create() {
-    const { width, height } = this.scale;
+    this.createQuestionUI();
+    
+    // Escuchar cambios de tamaño
+    this.scale.on('resize', this.resize, this);
+  }
+
+  createQuestionUI() {
+    // Limpiar UI anterior si existe
+    if (this.questionContainer) {
+      this.questionContainer.destroy();
+    }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    // Contenedor para todos los elementos
+    this.questionContainer = this.add.container(0, 0);
+    this.questionContainer.setDepth(2000);
 
     // Fondo semi-transparente
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85);
+    const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.85);
+    overlay.setOrigin(0);
 
     // Panel de pregunta - adaptativo
     const panelWidth = Math.min(700, width * 0.85);
@@ -136,8 +166,7 @@ export default class QuestionScene extends Phaser.Scene {
       this.optionButtons.push(button);
     });
 
-    // Temporizador de respuesta
-    this.timeLeft = 30;
+    // Temporizador de respuesta (tiempo desde configuración)
     const timerSize = Math.min(20, width / 50);
     this.timerText = this.add.text(width / 2, height * 0.85, `Tiempo: ${this.timeLeft}s`, {
       fontSize: timerSize + 'px',
@@ -145,6 +174,23 @@ export default class QuestionScene extends Phaser.Scene {
       color: '#f39c12'
     });
     this.timerText.setOrigin(0.5);
+
+    // Añadir elementos al contenedor
+    this.questionContainer.add([overlay, panel, title, questionText, this.timerText]);
+    this.optionButtons.forEach(btn => {
+      this.questionContainer.add(btn.container);
+    });
+
+    // Iniciar temporizador solo si no se está recreando después de responder
+    if (!this.answered) {
+      this.startTimer();
+    }
+  }
+
+  startTimer() {
+    if (this.timerEvent) {
+      this.timerEvent.remove();
+    }
 
     this.timerEvent = this.time.addEvent({
       delay: 1000,
@@ -161,7 +207,7 @@ export default class QuestionScene extends Phaser.Scene {
   }
 
   createOptionButton(x, y, text, index, width, height) {
-    const button = this.add.container(x, y);
+    const container = this.add.container(x, y);
 
     // Fondo del botón
     const bg = this.add.rectangle(0, 0, width, height, 0x34495e);
@@ -187,46 +233,48 @@ export default class QuestionScene extends Phaser.Scene {
     });
     optionText.setOrigin(0, 0.5);
 
-    button.add([bg, letter, optionText]);
-    button.setSize(width, height);
-    button.setInteractive({ useHandCursor: true });
-    button.setData('index', index);
-    button.setData('bg', bg);
+    container.add([bg, letter, optionText]);
+    container.setSize(width, height);
+    container.setInteractive({ useHandCursor: true });
 
     // Efectos hover
-    button.on('pointerover', () => {
+    container.on('pointerover', () => {
       if (!this.answered) {
         bg.setFillStyle(0x4a5f7f);
       }
     });
 
-    button.on('pointerout', () => {
+    container.on('pointerout', () => {
       if (!this.answered && this.selectedOption !== index) {
         bg.setFillStyle(0x34495e);
       }
     });
 
-    button.on('pointerdown', () => {
+    container.on('pointerdown', () => {
       if (!this.answered) {
-        this.selectAnswer(index);
+        this.selectAnswer(index, bg);
       }
     });
 
-    return button;
+    return { container, bg, index };
   }
 
-  selectAnswer(index) {
+  selectAnswer(index, clickedBg) {
     if (this.answered) return;
 
     this.answered = true;
     this.selectedOption = index;
-    this.timerEvent.remove();
+    
+    if (this.timerEvent) {
+      this.timerEvent.remove();
+    }
 
     const correct = index === this.currentQuestion.correctAnswer;
 
     // Colorear las opciones
-    this.optionButtons.forEach((button, i) => {
-      const bg = button.getData('bg');
+    this.optionButtons.forEach((btnObj) => {
+      const bg = btnObj.bg;
+      const i = btnObj.index;
       
       if (i === this.currentQuestion.correctAnswer) {
         // Opción correcta en verde
@@ -240,7 +288,7 @@ export default class QuestionScene extends Phaser.Scene {
         bg.setFillStyle(0x7f8c8d);
       }
 
-      button.disableInteractive();
+      btnObj.container.disableInteractive();
     });
 
     // Mostrar resultado
@@ -257,6 +305,9 @@ export default class QuestionScene extends Phaser.Scene {
     );
     resultText.setOrigin(0.5);
     resultText.setAlpha(0);
+    resultText.setDepth(3000);
+    
+    this.questionContainer.add(resultText);
 
     this.tweens.add({
       targets: resultText,
@@ -271,9 +322,19 @@ export default class QuestionScene extends Phaser.Scene {
     });
   }
 
+  resize(gameSize) {
+    // NO recrear la UI si ya se respondió para evitar el parpadeo
+    if (this.answered) {
+      return;
+    }
+    // Solo recrear si aún no se ha respondido
+    this.createQuestionUI();
+  }
+
   shutdown() {
     if (this.timerEvent) {
       this.timerEvent.remove();
     }
+    this.scale.off('resize', this.resize, this);
   }
 }

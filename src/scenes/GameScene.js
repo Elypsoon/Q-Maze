@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import MazeGenerator from '../utils/MazeGenerator';
+import { GAME_CONFIG } from './QuestionScene';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -12,14 +13,14 @@ export default class GameScene extends Phaser.Scene {
     this.lives = 3;
     this.score = 0;
     
-    // Configuración del laberinto
-    this.mazeRows = 15;
-    this.mazeCols = 15;
+    // Configuración del laberinto - Aumentado de 15x15 a 20x20
+    this.mazeRows = 20;
+    this.mazeCols = 20;
     this.cellSize = 40;
     
     // Temporizadores
-    this.totalTimeLimit = 300; // 5 minutos en segundos
-    this.questionTimeInterval = 20; // Cada 20 segundos lanza pregunta
+    this.totalTimeLimit = 420; // 7 minutos en segundos (aumentado de 5)
+    this.questionTimeInterval = 25; // Cada 25 segundos lanza pregunta (aumentado de 20)
     this.timeElapsed = 0;
     this.timeSinceLastQuestion = 0;
     
@@ -31,23 +32,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = this.scale;
-
-    // Calcular el tamaño del laberinto basado en el área disponible
-    // Reservamos espacio para el panel de estadísticas
-    const uiPanelWidth = 250;
-    const availableWidth = width - uiPanelWidth - 40; // margen
-    const availableHeight = height - 40; // margen
+    this.calculateDimensions();
     
-    // Calcular el tamaño óptimo de celda
-    const maxCellWidth = Math.floor(availableWidth / this.mazeCols);
-    const maxCellHeight = Math.floor(availableHeight / this.mazeRows);
-    this.cellSize = Math.min(maxCellWidth, maxCellHeight);
-    
-    // Calcular el offset para centrar el laberinto
-    this.mazeOffsetX = 20;
-    this.mazeOffsetY = (height - (this.mazeRows * this.cellSize)) / 2;
-
     // Generar el laberinto
     this.generateMaze();
 
@@ -73,6 +59,29 @@ export default class GameScene extends Phaser.Scene {
 
     // Iniciar temporizadores
     this.startTimers();
+    
+    // Escuchar cambios de tamaño
+    this.scale.on('resize', this.resize, this);
+  }
+
+  calculateDimensions() {
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    // Calcular el tamaño del laberinto basado en el área disponible
+    // Reducimos el espacio reservado para el panel UI para que el laberinto sea más grande
+    const uiPanelWidth = Math.min(240, width * 0.18); // Reducido de 0.25 a 0.18
+    const availableWidth = width - uiPanelWidth - 30; // Menos margen
+    const availableHeight = height - 30; // Menos margen
+    
+    // Calcular el tamaño óptimo de celda
+    const maxCellWidth = Math.floor(availableWidth / this.mazeCols);
+    const maxCellHeight = Math.floor(availableHeight / this.mazeRows);
+    this.cellSize = Math.min(maxCellWidth, maxCellHeight, 45); // Aumentado de 50 a 60px máximo
+    
+    // Calcular el offset para centrar el laberinto
+    this.mazeOffsetX = 15;
+    this.mazeOffsetY = Math.max(15, (height - (this.mazeRows * this.cellSize)) / 2);
   }
 
   generateMaze() {
@@ -256,13 +265,24 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createUI() {
-    const { width, height } = this.scale;
+    // Limpiar UI anterior si existe
+    if (this.uiContainer) {
+      this.uiContainer.destroy();
+    }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
     
-    // Crear panel de estadísticas en el lado derecho
-    const panelX = width - 240;
+    // Crear contenedor para la UI
+    this.uiContainer = this.add.container(0, 0);
+    this.uiContainer.setScrollFactor(0);
+    this.uiContainer.setDepth(100);
+    
+    // Crear panel de estadísticas en el lado derecho (responsive)
+    const panelWidth = Math.min(220, width * 0.2);
+    const panelHeight = Math.min(400, height * 0.7);
+    const panelX = width - panelWidth - 10;
     const panelY = 20;
-    const panelWidth = 220;
-    const panelHeight = 400;
     
     // Fondo del panel
     const panel = this.add.rectangle(
@@ -274,18 +294,20 @@ export default class GameScene extends Phaser.Scene {
       0.95
     );
     panel.setStrokeStyle(3, 0xe74c3c);
-    panel.setScrollFactor(0);
-    panel.setDepth(100);
+
+    // Tamaños de fuente adaptativos
+    const titleFontSize = Math.min(20, width * 0.018);
+    const mainFontSize = Math.min(16, width * 0.015);
+    const smallFontSize = Math.min(14, width * 0.013);
+    const tinyFontSize = Math.min(12, width * 0.011);
 
     // Título del panel
     const panelTitle = this.add.text(panelX + panelWidth / 2, panelY + 20, 'ESTADÍSTICAS', {
-      fontSize: '20px',
+      fontSize: titleFontSize + 'px',
       fontFamily: 'Arial Black',
       color: '#ecf0f1'
     });
     panelTitle.setOrigin(0.5, 0);
-    panelTitle.setScrollFactor(0);
-    panelTitle.setDepth(101);
 
     // Línea divisoria
     const divider = this.add.rectangle(
@@ -295,44 +317,37 @@ export default class GameScene extends Phaser.Scene {
       2,
       0x7f8c8d
     );
-    divider.setScrollFactor(0);
-    divider.setDepth(101);
 
     // Textos de estadísticas
     const textConfig = {
-      fontSize: '16px',
+      fontSize: mainFontSize + 'px',
       fontFamily: 'Arial',
       color: '#ecf0f1'
     };
 
     this.livesText = this.add.text(panelX + 15, panelY + 70, '', textConfig);
-    this.livesText.setScrollFactor(0);
-    this.livesText.setDepth(101);
-
     this.timeText = this.add.text(panelX + 15, panelY + 130, '', textConfig);
-    this.timeText.setScrollFactor(0);
-    this.timeText.setDepth(101);
-
     this.questionTimerText = this.add.text(panelX + 15, panelY + 210, '', {
-      fontSize: '14px',
+      fontSize: smallFontSize + 'px',
       fontFamily: 'Arial',
       color: '#ecf0f1'
     });
-    this.questionTimerText.setScrollFactor(0);
-    this.questionTimerText.setDepth(101);
-
     this.scoreText = this.add.text(panelX + 15, panelY + 290, '', textConfig);
-    this.scoreText.setScrollFactor(0);
-    this.scoreText.setDepth(101);
-
+    
     // Indicador de invulnerabilidad
     this.invulnerableText = this.add.text(panelX + 15, panelY + 340, '', {
-      fontSize: '12px',
+      fontSize: tinyFontSize + 'px',
       fontFamily: 'Arial',
       color: '#f39c12'
     });
-    this.invulnerableText.setScrollFactor(0);
-    this.invulnerableText.setDepth(101);
+
+    // Añadir todos los elementos al contenedor
+    this.uiContainer.add([
+      panel, panelTitle, divider, 
+      this.livesText, this.timeText, 
+      this.questionTimerText, this.scoreText, 
+      this.invulnerableText
+    ]);
 
     this.updateUI();
   }
@@ -437,7 +452,8 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
-      this.score += 500;
+      // Usar configuración del servidor (futuro)
+      this.score += GAME_CONFIG.POINTS_COMPLETE_MAZE;
       this.endGame(true, '¡Felicidades! ¡Completaste el laberinto!');
     }
   }
@@ -462,8 +478,9 @@ export default class GameScene extends Phaser.Scene {
     this.scene.resume();
 
     if (correct) {
-      this.score += 50;
-      this.showFeedback('¡Correcto! +50 puntos', 0x2ecc71);
+      // Usar configuración del servidor (futuro)
+      this.score += GAME_CONFIG.POINTS_CORRECT_ANSWER;
+      this.showFeedback(`¡Correcto! +${GAME_CONFIG.POINTS_CORRECT_ANSWER} puntos`, 0x2ecc71);
     } else {
       this.lives--;
       this.showFeedback('¡Incorrecto! -1 vida', 0xe74c3c);
@@ -473,16 +490,21 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Activar invulnerabilidad por 1 segundos
+    // Activar invulnerabilidad (duración desde configuración)
     this.invulnerable = true;
+    
+    // Calcular número de parpadeos según la duración
+    const invulnerabilityDuration = GAME_CONFIG.INVULNERABILITY_DURATION;
+    const blinkDuration = 200; // Duración de cada parpadeo
+    const repeatCount = Math.floor(invulnerabilityDuration / (blinkDuration * 2)) - 1;
     
     // Efecto visual de invulnerabilidad (parpadeo)
     this.tweens.add({
       targets: this.player,
       alpha: 0.5,
-      duration: 200,
+      duration: blinkDuration,
       yoyo: true,
-      repeat: 4, // 5 parpadeos en 1 segundos
+      repeat: repeatCount,
       onComplete: () => {
         this.player.alpha = 1;
         this.invulnerable = false;
@@ -573,5 +595,21 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.cursors.down.isDown) {
       this.player.body.setVelocityY(speed);
     }
+  }
+
+  resize(gameSize) {
+    const width = gameSize.width;
+    const height = gameSize.height;
+
+    // Actualizar la cámara
+    this.cameras.main.setSize(width, height);
+    
+    // Recrear UI con las nuevas dimensiones
+    this.createUI();
+  }
+
+  shutdown() {
+    // Limpiar el listener cuando se cierre la escena
+    this.scale.off('resize', this.resize, this);
   }
 }

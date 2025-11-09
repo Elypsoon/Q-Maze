@@ -6,12 +6,29 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = this.scale;
+    this.createMenu();
+    
+    // Escuchar cambios de tamaño
+    this.scale.on('resize', this.resize, this);
+  }
+
+  createMenu() {
+    // Limpiar elementos anteriores si existen
+    if (this.menuContainer) {
+      this.menuContainer.destroy();
+    }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    // Contenedor para todos los elementos del menú
+    this.menuContainer = this.add.container(0, 0);
 
     // Fondo con gradiente simulado
     const graphics = this.add.graphics();
     graphics.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e, 1);
     graphics.fillRect(0, 0, width, height);
+    this.menuContainer.add(graphics);
 
     // Título del juego - ajustado al tamaño de pantalla
     const titleSize = Math.min(80, width / 15);
@@ -59,7 +76,8 @@ export default class MenuScene extends Phaser.Scene {
       '• Evita tocar las paredes\n' +
       '• Pisa las zonas especiales de preguntas\n' +
       '• Responde correctamente para conservar tus vidas\n' +
-      '• Tienes 3 vidas y tiempo límite\n', {
+      '• Tienes 3 vidas y tiempo límite\n' +
+      '• 2 segundos de invulnerabilidad tras cada pregunta', {
       fontSize: instrSize + 'px',
       fontFamily: 'Arial',
       color: '#95a5a6',
@@ -68,8 +86,11 @@ export default class MenuScene extends Phaser.Scene {
     });
     instructions.setOrigin(0.5);
 
+    // Agregar elementos al contenedor
+    this.menuContainer.add([title, subtitle, description, instructions]);
+
     // Animación de parpadeo en el título
-    this.tweens.add({
+    this.titleTween = this.tweens.add({
       targets: title,
       scaleX: 1.05,
       scaleY: 1.05,
@@ -78,6 +99,19 @@ export default class MenuScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut'
     });
+  }
+
+  resize(gameSize) {
+    // Recrear el menú con las nuevas dimensiones
+    this.createMenu();
+  }
+
+  shutdown() {
+    // Limpiar el listener cuando se cierre la escena
+    this.scale.off('resize', this.resize, this);
+    if (this.titleTween) {
+      this.titleTween.remove();
+    }
   }
 
   createButton(x, y, text, width, height, callback) {

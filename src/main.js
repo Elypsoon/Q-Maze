@@ -6,11 +6,11 @@ import QuestionScene from "./scenes/QuestionScene";
 const config = {
   type: Phaser.AUTO,
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.RESIZE, 
     parent: "game",
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1200,
-    height: 800
+    width: window.innerWidth,
+    height: window.innerHeight
   },
   scene: [MenuScene, GameScene, QuestionScene],
   physics: {
@@ -24,3 +24,8 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+// Event listener para ajustar el tamaño cuando se redimensione la ventana
+window.addEventListener('resize', () => {
+  game.scale.resize(window.innerWidth, window.innerHeight);
+});

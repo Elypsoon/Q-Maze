@@ -4,14 +4,14 @@ import GameScene from "./scenes/GameScene";
 import QuestionScene from "./scenes/QuestionScene";
 
 const config = {
-  type: Phaser.WEBGL, // Forzar WebGL para mejor rendimiento
+  type: Phaser.WEBGL,
   scale: {
     mode: Phaser.Scale.RESIZE, 
     parent: "game",
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: window.innerWidth,
     height: window.innerHeight,
-    // Mejorar la resolución y nitidez - usar el doble de resolución
+    // Obtiene la mejor resolución posible según el dispositivo
     resolution: Math.max(2, window.devicePixelRatio || 2),
   },
   scene: [MenuScene, GameScene, QuestionScene],
@@ -23,13 +23,13 @@ const config = {
     }
   },
   backgroundColor: '#1a1a2e',
-  // Configuración de renderizado para mejor calidad
+  // Configuración de renderizado
   render: {
     antialias: true,
     antialiasGL: true,
     pixelArt: false,
     roundPixels: false,
-    powerPreference: "high-performance" // Usar GPU de alto rendimiento
+    powerPreference: "high-performance" // Usar GPU si es posible
   }
 };
 

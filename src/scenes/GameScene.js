@@ -13,14 +13,14 @@ export default class GameScene extends Phaser.Scene {
     this.lives = 3;
     this.score = 0;
     
-    // Configuración del laberinto - Aumentado de 15x15 a 20x20
+    // Configuración del tamaño del laberinto
     this.mazeRows = 20;
     this.mazeCols = 20;
     this.cellSize = 40;
     
     // Temporizadores
-    this.totalTimeLimit = 420; // 7 minutos en segundos (aumentado de 5)
-    this.questionTimeInterval = 25; // Cada 25 segundos lanza pregunta (aumentado de 20)
+    this.totalTimeLimit = 300; // 5 minutos en segundos
+    this.questionTimeInterval = 20; // Cada 20 segundos lanza pregunta (aumentado de 20)
     this.timeElapsed = 0;
     this.timeSinceLastQuestion = 0;
     
@@ -70,14 +70,14 @@ export default class GameScene extends Phaser.Scene {
 
     // Calcular el tamaño del laberinto basado en el área disponible
     // Reducimos el espacio reservado para el panel UI para que el laberinto sea más grande
-    const uiPanelWidth = Math.min(240, width * 0.18); // Reducido de 0.25 a 0.18
-    const availableWidth = width - uiPanelWidth - 30; // Menos margen
-    const availableHeight = height - 30; // Menos margen
+    const uiPanelWidth = Math.min(240, width * 0.18);
+    const availableWidth = width - uiPanelWidth - 30;
+    const availableHeight = height - 30;
     
     // Calcular el tamaño óptimo de celda
     const maxCellWidth = Math.floor(availableWidth / this.mazeCols);
     const maxCellHeight = Math.floor(availableHeight / this.mazeRows);
-    this.cellSize = Math.min(maxCellWidth, maxCellHeight, 45); // Aumentado de 50 a 60px máximo
+    this.cellSize = Math.min(maxCellWidth, maxCellHeight, 45);
     
     // Calcular el offset para centrar el laberinto
     this.mazeOffsetX = 15;
@@ -120,7 +120,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize / 2,
             '?',
             {
-              fontSize: Math.max(16, this.cellSize / 2) + 'px',
+              fontSize: Math.max(20, this.cellSize / 1.5) + 'px',
               fontFamily: 'Arial Black',
               color: '#ffffff'
             }
@@ -217,8 +217,8 @@ export default class GameScene extends Phaser.Scene {
       0x2ecc71
     );
     this.add.text(startX, startY, 'INICIO', {
-      fontSize: Math.max(10, this.cellSize / 5) + 'px',
-      fontFamily: 'Arial',
+      fontSize: Math.max(14, this.cellSize / 3.5) + 'px',
+      fontFamily: 'Arial Black',
       color: '#ffffff'
     }).setOrigin(0.5);
 
@@ -233,7 +233,7 @@ export default class GameScene extends Phaser.Scene {
       0xf39c12
     );
     this.add.text(endX, endY, 'META', {
-      fontSize: Math.max(10, this.cellSize / 5) + 'px',
+      fontSize: Math.max(14, this.cellSize / 3.5) + 'px',
       fontFamily: 'Arial Black',
       color: '#ffffff'
     }).setOrigin(0.5);
@@ -295,11 +295,11 @@ export default class GameScene extends Phaser.Scene {
     );
     panel.setStrokeStyle(3, 0xe74c3c);
 
-    // Tamaños de fuente adaptativos
-    const titleFontSize = Math.min(20, width * 0.018);
-    const mainFontSize = Math.min(16, width * 0.015);
-    const smallFontSize = Math.min(14, width * 0.013);
-    const tinyFontSize = Math.min(12, width * 0.011);
+    // Tamaños de fuente adaptativos - Aumentados
+    const titleFontSize = Math.min(26, width * 0.024);
+    const mainFontSize = Math.min(20, width * 0.019);
+    const smallFontSize = Math.min(18, width * 0.017);
+    const tinyFontSize = Math.min(16, width * 0.015);
 
     // Título del panel
     const panelTitle = this.add.text(panelX + panelWidth / 2, panelY + 20, 'ESTADÍSTICAS', {
@@ -521,8 +521,8 @@ export default class GameScene extends Phaser.Scene {
       this.player.y - 30,
       message,
       {
-        fontSize: '16px',
-        fontFamily: 'Arial',
+        fontSize: '20px',
+        fontFamily: 'Arial Black',
         color: '#ffffff',
         backgroundColor: Phaser.Display.Color.IntegerToColor(color).rgba,
         padding: { x: 10, y: 5 }
@@ -555,8 +555,8 @@ export default class GameScene extends Phaser.Scene {
       `Tiempo usado: ${Math.floor(this.timeElapsed)}s\n\n` +
       'Presiona ESPACIO para volver al menú',
       {
-        fontSize: '24px',
-        fontFamily: 'Arial',
+        fontSize: '28px',
+        fontFamily: 'Arial Black',
         color: '#ffffff',
         backgroundColor: won ? '#27ae60' : '#c0392b',
         padding: { x: 20, y: 20 },

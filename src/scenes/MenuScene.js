@@ -31,19 +31,19 @@ export default class MenuScene extends Phaser.Scene {
     this.menuContainer.add(graphics);
 
     // Título del juego - ajustado al tamaño de pantalla
-    const titleSize = Math.min(80, width / 15);
+    const titleSize = Math.min(100, width / 10);
     const title = this.add.text(width / 2, height * 0.15, 'Q-MAZE', {
       fontSize: titleSize + 'px',
       fontFamily: 'Arial Black',
       color: '#0f3460',
       stroke: '#e94560',
-      strokeThickness: 6
+      strokeThickness: 8
     });
     title.setOrigin(0.5);
 
     // Subtítulo
-    const subtitleSize = Math.min(28, width / 35);
-    const subtitle = this.add.text(width / 2, height * 0.25, 'Laberinto Educativo', {
+    const subtitleSize = Math.min(36, width / 25);
+    const subtitle = this.add.text(width / 2, height * 0.25, 'Laberinto con trivia', {
       fontSize: subtitleSize + 'px',
       fontFamily: 'Arial',
       color: '#f1f1f1'
@@ -51,7 +51,7 @@ export default class MenuScene extends Phaser.Scene {
     subtitle.setOrigin(0.5);
 
     // Descripción
-    const descSize = Math.min(18, width / 55);
+    const descSize = Math.min(24, width / 40);
     const description = this.add.text(width / 2, height * 0.33, 
       'Navega por el laberinto y responde preguntas\n' +
       'para mantener tus vidas. ¡Llega al final!', {
@@ -70,14 +70,13 @@ export default class MenuScene extends Phaser.Scene {
     });
 
     // Instrucciones
-    const instrSize = Math.min(14, width / 70);
+    const instrSize = Math.min(18, width / 55);
     const instructions = this.add.text(width / 2, height * 0.65, 
       'Controles: ← ↑ → ↓ para moverte\n\n' +
       '• Evita tocar las paredes\n' +
       '• Pisa las zonas especiales de preguntas\n' +
       '• Responde correctamente para conservar tus vidas\n' +
-      '• Tienes 3 vidas y tiempo límite\n' +
-      '• 2 segundos de invulnerabilidad tras cada pregunta', {
+      '• Tienes 3 vidas y tiempo límite\n', {
       fontSize: instrSize + 'px',
       fontFamily: 'Arial',
       color: '#95a5a6',
@@ -122,7 +121,7 @@ export default class MenuScene extends Phaser.Scene {
     bg.setStrokeStyle(3, 0x0f3460);
 
     // Texto del botón
-    const buttonTextSize = Math.min(32, width / 8);
+    const buttonTextSize = Math.min(36, width / 7);
     const buttonText = this.add.text(0, 0, text, {
       fontSize: buttonTextSize + 'px',
       fontFamily: 'Arial Black',

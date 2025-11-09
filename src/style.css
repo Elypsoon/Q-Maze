@@ -44,6 +44,19 @@ canvas {
   display: block;
   max-width: 100%;
   max-height: 100%;
+  /* Mejoras para renderizado */
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+  
+  /* Para textos y gráficos suaves */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Habilitar aceleración por hardware */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 
 a {

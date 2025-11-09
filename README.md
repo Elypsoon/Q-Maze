@@ -7,12 +7,12 @@ Q-Maze es un videojuego educativo que combina laberintos generados proceduralmen
 - **Laberintos Procedurales**: Generados aleatoriamente con algoritmo de semilla para reproducibilidad
 - **Sistema de Preguntas**: Tres formas de activar preguntas:
   1. Tocar una pared o obstáculo
-  2. Temporizador automático (cada 25 segundos)
-  3. Zonas especiales de preguntas en el mapa (un solo uso por zona)
+  2. Temporizador automático
+  3. Zonas especiales de preguntas en el mapa
 - **Sistema de Vidas**: 3 vidas iniciales, se pierde una por respuesta incorrecta
 - **Temporizador**: 7 minutos para completar el laberinto
 - **Puntuación**: Gana puntos por respuestas correctas y completar el laberinto
-- **Invulnerabilidad**: 2 segundos de protección después de responder preguntas (evita preguntas consecutivas pero mantiene colisiones físicas)
+- **Invulnerabilidad**: 1 segundo de protección después de responder preguntas
 - **Diseño Responsive**: Se adapta a cualquier tamaño de pantalla manteniendo la proporción
 - **UI No Intrusiva**: Panel de estadísticas fijo que no tapa el área de juego
 - **Laberinto Grande**: Malla de 20x20 celdas para más desafío
@@ -67,7 +67,7 @@ QMaze/
 
 ### Generación del Laberinto
 - Utiliza el algoritmo **Recursive Backtracking**
-- Laberinto de 20x20 celdas (aumentado para más desafío)
+- Laberinto de 20x20 celdas
 - Generación con semilla para reproducibilidad
 - Aproximadamente 10% de las celdas son zonas de preguntas
 - Tamaño de celdas adaptativo según el tamaño de pantalla
@@ -78,10 +78,8 @@ QMaze/
 - **-1 vida** por respuesta incorrecta
 
 ### Sistema de Invulnerabilidad
-- **Duración**: 1 segundo después de responder cualquier pregunta (configurable desde servidor)
+- **Duración**: 1 segundo después de responder cualquier pregunta
 - **Efecto**: Evita que se lancen nuevas preguntas al tocar paredes
-- **Feedback visual**: El jugador parpadea y aparece el indicador "🛡️ INVULNERABLE"
-- **Nota importante**: La invulnerabilidad NO permite atravesar paredes, solo previene preguntas consecutivas
 
 ### Sistema de Preguntas
 - **Tiempo límite**: 10 segundos por pregunta (configurable desde servidor)
@@ -95,7 +93,7 @@ QMaze/
 
 ### Condiciones de Fin de Juego
 - ✅ **Victoria**: Llegar a la meta con al menos 1 vida
-- ❌ **Derrota**: Perder todas las vidas o que se acabe el tiempo total (7 minutos)
+- ❌ **Derrota**: Perder todas las vidas o que se acabe el tiempo total
 
 ## 📋 Próximas Características
 
@@ -104,9 +102,7 @@ QMaze/
 - [ ] API REST para configuración dinámica (tiempo, puntos, recompensas)
 - [ ] Diferentes niveles de dificultad
 - [ ] Más categorías de preguntas
-- [ ] Sistema de logros
-- [ ] Tabla de clasificación
-- [ ] Modo multijugador
+- [ ] Registros de juego
 
 ## 🔧 Configuración del Juego
 
@@ -133,22 +129,6 @@ Q-Maze está diseñado para:
 - Reforzar conocimientos mediante preguntas de trivia
 - Desarrollar habilidades de navegación espacial
 - Combinar aprendizaje con entretenimiento
-- Facilitar la actualización del banco de preguntas
-
-## 📝 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
-
-## 👨‍💻 Desarrollo
-
-Para contribuir al proyecto:
-
-1. Fork el repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
 ---
 
 Desarrollado con ❤️ para hacer el aprendizaje más divertido

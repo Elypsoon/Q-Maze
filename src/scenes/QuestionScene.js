@@ -128,7 +128,7 @@ export default class QuestionScene extends Phaser.Scene {
       'zona': '❓ ¡Zona de pregunta!'
     };
     
-    const titleSize = Math.min(32, width / 30);
+    const titleSize = Math.min(40, width / 22);
     const title = this.add.text(width / 2, height * 0.2, reasons[this.reason] || '❓ Pregunta', {
       fontSize: titleSize + 'px',
       fontFamily: 'Arial Black',
@@ -137,7 +137,7 @@ export default class QuestionScene extends Phaser.Scene {
     title.setOrigin(0.5);
 
     // Pregunta
-    const questionSize = Math.min(22, width / 45);
+    const questionSize = Math.min(26, width / 35);
     const questionText = this.add.text(width / 2, height * 0.3, this.currentQuestion.question, {
       fontSize: questionSize + 'px',
       fontFamily: 'Arial',
@@ -167,10 +167,10 @@ export default class QuestionScene extends Phaser.Scene {
     });
 
     // Temporizador de respuesta (tiempo desde configuración)
-    const timerSize = Math.min(20, width / 50);
+    const timerSize = Math.min(24, width / 40);
     this.timerText = this.add.text(width / 2, height * 0.85, `Tiempo: ${this.timeLeft}s`, {
       fontSize: timerSize + 'px',
-      fontFamily: 'Arial',
+      fontFamily: 'Arial Black',
       color: '#f39c12'
     });
     this.timerText.setOrigin(0.5);
@@ -215,7 +215,7 @@ export default class QuestionScene extends Phaser.Scene {
 
     // Letra de la opción
     const letters = ['A', 'B', 'C', 'D'];
-    const letterSize = Math.min(24, height / 2);
+    const letterSize = Math.min(28, height / 1.8);
     const letter = this.add.text(-width / 2 + 30, 0, letters[index], {
       fontSize: letterSize + 'px',
       fontFamily: 'Arial Black',
@@ -224,7 +224,7 @@ export default class QuestionScene extends Phaser.Scene {
     letter.setOrigin(0.5);
 
     // Texto de la opción
-    const textSize = Math.min(18, height / 3);
+    const textSize = Math.min(22, height / 2.5);
     const optionText = this.add.text(-width / 2 + 60, 0, text, {
       fontSize: textSize + 'px',
       fontFamily: 'Arial',
@@ -292,7 +292,7 @@ export default class QuestionScene extends Phaser.Scene {
     });
 
     // Mostrar resultado
-    const resultSize = Math.min(28, this.scale.width / 35);
+    const resultSize = Math.min(34, this.scale.width / 28);
     const resultText = this.add.text(
       this.scale.width / 2,
       this.scale.height * 0.75,
@@ -323,7 +323,6 @@ export default class QuestionScene extends Phaser.Scene {
   }
 
   resize(gameSize) {
-    // NO recrear la UI si ya se respondió para evitar el parpadeo
     if (this.answered) {
       return;
     }

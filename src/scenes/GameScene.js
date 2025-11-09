@@ -29,6 +29,7 @@ export default class GameScene extends Phaser.Scene {
     this.wallTouched = false;
     this.questionActive = false;
     this.invulnerable = false; // Estado de invulnerabilidad
+    this.isPaused = false; // Estado de pausa
   }
 
   create() {
@@ -45,6 +46,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Configurar controles
     this.cursors = this.input.keyboard.createCursorKeys();
+    
+    // Tecla de pausa (ESC o P)
+    this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.pauseKeyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
     // Configurar cámara para que siga al jugador pero dentro de los límites del laberinto
     const mazeWidth = this.mazeCols * this.cellSize;
@@ -385,7 +390,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateTimers() {
-    if (this.gameOver || this.questionActive) return;
+    if (this.gameOver || this.questionActive || this.isPaused) return;
 
     this.timeElapsed++;
     this.timeSinceLastQuestion++;
@@ -573,8 +578,208 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  togglePause() {
+    if (this.gameOver || this.questionActive) return;
+    
+    this.isPaused = !this.isPaused;
+    
+    if (this.isPaused) {
+      // Pausar física
+      this.physics.pause();
+      
+      // Pausar temporizadores
+      if (this.gameTimer) {
+        this.gameTimer.paused = true;
+      }
+      
+      // Mostrar menú de pausa
+      this.showPauseMenu();
+    } else {
+      // Reanudar física
+      this.physics.resume();
+      
+      // Reanudar temporizadores
+      if (this.gameTimer) {
+        this.gameTimer.paused = false;
+      }
+      
+      // Ocultar menú de pausa
+      this.hidePauseMenu();
+    }
+  }
+
+  showPauseMenu() {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    
+    // Contenedor para el menú de pausa
+    this.pauseContainer = this.add.container(0, 0);
+    this.pauseContainer.setScrollFactor(0);
+    this.pauseContainer.setDepth(10000);
+    
+    // Overlay oscuro
+    const overlay = this.add.rectangle(0, 0, width * 2, height * 2, 0x000000, 0.8);
+    overlay.setOrigin(0, 0);
+    
+    // Panel del menú
+    const panelWidth = Math.min(500, width * 0.8);
+    const panelHeight = Math.min(450, height * 0.7);
+    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2c3e50);
+    panel.setStrokeStyle(4, 0xe74c3c);
+    
+    // Título
+    const titleSize = Math.min(48, width / 20);
+    const title = this.add.text(width / 2, height / 2 - panelHeight / 2 + 60, '⏸️ PAUSA', {
+      fontSize: titleSize + 'px',
+      fontFamily: 'Arial Black',
+      color: '#ecf0f1'
+    });
+    title.setOrigin(0.5);
+    
+    // Agregar elementos base al contenedor
+    this.pauseContainer.add([overlay, panel, title]);
+    
+    // Botones
+    const buttonWidth = Math.min(300, panelWidth * 0.7);
+    const buttonHeight = Math.min(60, height * 0.08);
+    const startY = height / 2 - 50;
+    const spacing = buttonHeight + 20;
+    
+    // Botón Reanudar
+    this.createPauseButton(
+      width / 2,
+      startY,
+      '▶️ Reanudar',
+      buttonWidth,
+      buttonHeight,
+      () => this.togglePause(),
+      0x27ae60
+    );
+    
+    // Botón Reiniciar
+    this.createPauseButton(
+      width / 2,
+      startY + spacing,
+      '🔄 Reiniciar',
+      buttonWidth,
+      buttonHeight,
+      () => this.restartGame(),
+      0x3498db
+    );
+    
+    // Botón Salir
+    this.createPauseButton(
+      width / 2,
+      startY + spacing * 2,
+      '🚪 Salir al Menú',
+      buttonWidth,
+      buttonHeight,
+      () => this.exitToMenu(),
+      0xe74c3c
+    );
+    
+    // Instrucción
+    const instrSize = Math.min(18, width / 50);
+    const instruction = this.add.text(width / 2, height / 2 + panelHeight / 2 - 40, 'Presiona ESC o P para reanudar', {
+      fontSize: instrSize + 'px',
+      fontFamily: 'Arial',
+      color: '#95a5a6',
+      align: 'center'
+    });
+    instruction.setOrigin(0.5);
+    
+    // Agregar instrucción al contenedor
+    this.pauseContainer.add(instruction);
+  }
+
+  createPauseButton(x, y, text, width, height, callback, color = 0xe94560) {
+    const button = this.add.container(x, y);
+    button.setDepth(10001); // Mayor que el contenedor de pausa
+    
+    // Fondo del botón
+    const bg = this.add.rectangle(0, 0, width, height, color);
+    bg.setStrokeStyle(3, 0xffffff);
+    
+    // Texto del botón
+    const buttonTextSize = Math.min(24, width / 12);
+    const buttonText = this.add.text(0, 0, text, {
+      fontSize: buttonTextSize + 'px',
+      fontFamily: 'Arial Black',
+      color: '#ffffff'
+    });
+    buttonText.setOrigin(0.5);
+    
+    button.add([bg, buttonText]);
+    button.setSize(width, height);
+    button.setInteractive({ useHandCursor: true });
+    
+    // Efectos hover
+    button.on('pointerover', () => {
+      bg.setStrokeStyle(4, 0xf39c12);
+      this.tweens.add({
+        targets: button,
+        scaleX: 1.05,
+        scaleY: 1.05,
+        duration: 100
+      });
+    });
+    
+    button.on('pointerout', () => {
+      bg.setStrokeStyle(3, 0xffffff);
+      this.tweens.add({
+        targets: button,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 100
+      });
+    });
+    
+    button.on('pointerdown', () => {
+      this.tweens.add({
+        targets: button,
+        scaleX: 0.95,
+        scaleY: 0.95,
+        duration: 50,
+        yoyo: true,
+        onComplete: callback
+      });
+    });
+    
+    // Agregar el botón al contenedor de pausa
+    this.pauseContainer.add(button);
+    return button;
+  }
+
+  hidePauseMenu() {
+    if (this.pauseContainer) {
+      this.pauseContainer.destroy();
+      this.pauseContainer = null;
+    }
+    if (this.pauseButtons) {
+      this.pauseButtons = [];
+    }
+  }
+
+  restartGame() {
+    this.hidePauseMenu();
+    this.scene.stop('QuestionScene');
+    this.scene.restart({ seed: Date.now() });
+  }
+
+  exitToMenu() {
+    this.hidePauseMenu();
+    this.scene.stop('QuestionScene');
+    this.scene.start('MenuScene');
+  }
+
   update(time, delta) {
-    if (this.gameOver || this.questionActive) {
+    // Verificar tecla de pausa
+    if (Phaser.Input.Keyboard.JustDown(this.pauseKey) || Phaser.Input.Keyboard.JustDown(this.pauseKeyP)) {
+      this.togglePause();
+      return;
+    }
+    
+    if (this.gameOver || this.questionActive || this.isPaused) {
       this.player.body.setVelocity(0);
       return;
     }
@@ -606,10 +811,19 @@ export default class GameScene extends Phaser.Scene {
     
     // Recrear UI con las nuevas dimensiones
     this.createUI();
+    
+    // Recrear menú de pausa si está activo
+    if (this.isPaused && this.pauseContainer) {
+      this.hidePauseMenu();
+      this.showPauseMenu();
+    }
   }
 
   shutdown() {
     // Limpiar el listener cuando se cierre la escena
     this.scale.off('resize', this.resize, this);
+    
+    // Limpiar menú de pausa si existe
+    this.hidePauseMenu();
   }
 }

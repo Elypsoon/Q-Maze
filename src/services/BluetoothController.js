@@ -194,8 +194,16 @@ export default class BluetoothController {
     // Mapear direcciones del ESP32 a teclas del juego
     const mappedInput = this.mapInputToKeys();
     
-    if (mappedInput) {
-      console.log('🎯 Enviando eventos al juego:', mappedInput);
+    if (mappedInput && mappedInput.length > 0) {
+      // Solo logear si hay cambios significativos (dirección o botones)
+      const directionChanged = this.currentState.direction !== this.lastState.direction;
+      const buttonChanged = this.currentState.buttonSW !== this.lastState.buttonSW || 
+                           this.currentState.buttonArcade !== this.lastState.buttonArcade;
+      
+      if (directionChanged || buttonChanged) {
+        console.log('🎯 Enviando eventos al juego:', mappedInput);
+      }
+      
       // Llamar a todos los callbacks de datos
       this.callbacks.onData.forEach(callback => {
         if (callback) callback(mappedInput);
@@ -212,24 +220,23 @@ export default class BluetoothController {
   mapInputToKeys() {
     const events = [];
 
-    // Solo enviar eventos de dirección si cambió
+    // SIEMPRE enviar el estado actual de dirección para movimiento continuo
     const direction = this.currentState.direction;
-    const directionChanged = direction !== this.lastState.direction;
     
-    if (directionChanged) {
-      // Para direcciones diagonales, enviar múltiples eventos
-      if (direction.includes('ARRIBA')) {
-        events.push({ type: 'direction', key: 'up', pressed: true });
-      } else if (direction.includes('ABAJO')) {
-        events.push({ type: 'direction', key: 'down', pressed: true });
-      } else if (direction.includes('IZQUIERDA')) {
-        events.push({ type: 'direction', key: 'left', pressed: true });
-      } else if (direction.includes('DERECHA')) {
-        events.push({ type: 'direction', key: 'right', pressed: true });
-      } else if (direction === 'CENTRO') {
-        events.push({ type: 'direction', key: 'none', pressed: false });
-      }
-    }
+    // Enviar el estado de todas las direcciones
+    const directionState = {
+      up: direction.includes('ARRIBA'),
+      down: direction.includes('ABAJO'),
+      left: direction.includes('IZQUIERDA'),
+      right: direction.includes('DERECHA')
+    };
+    
+    // Enviar evento de dirección con el estado completo
+    events.push({ 
+      type: 'direction', 
+      state: directionState,
+      pressed: direction !== 'CENTRO'
+    });
 
     // Mapear botones (solo cuando cambian de estado)
     if (this.currentState.buttonArcade && !this.lastState.buttonArcade) {

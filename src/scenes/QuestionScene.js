@@ -96,6 +96,11 @@ export default class QuestionScene extends Phaser.Scene {
     
     // Controlador Bluetooth
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
+    
+    // Sistema de navegación con joystick
+    this.lastJoystickState = { up: false, down: false, left: false, right: false };
+    this.navigationCooldown = false; // Prevenir navegación demasiado rápida
+    this.navigationRepeatDelay = 200; // 200ms entre cada movimiento de navegación
   }
 
   create() {
@@ -136,23 +141,42 @@ export default class QuestionScene extends Phaser.Scene {
     if (!events || this.answered) return;
 
     events.forEach(event => {
-      if (event.type === 'direction') {
-        // Navegación con el joystick
-        if (event.key === 'up') {
+      if (event.type === 'direction' && event.state) {
+        const currentState = event.state;
+        
+        // Navegación ARRIBA - con cooldown para repetición controlada
+        if (currentState.up && !this.navigationCooldown) {
           console.log('🎮 Mando: ARRIBA');
           this.moveSelection(-1);
-        } else if (event.key === 'down') {
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación ABAJO - con cooldown para repetición controlada
+        if (currentState.down && !this.navigationCooldown) {
           console.log('🎮 Mando: ABAJO');
           this.moveSelection(1);
-        } else if (event.key === 'none') {
-          console.log('🎮 Mando: CENTRO (reset)');
+          this.startNavigationCooldown();
         }
+        
+        // Actualizar estado anterior
+        this.lastJoystickState = { ...currentState };
+        
       } else if (event.type === 'button') {
         if (event.key === 'select') {
           console.log('🎮 Mando: BOTÓN ARCADE (confirmar)');
           this.confirmSelection();
         }
       }
+    });
+  }
+  
+  /**
+   * Inicia el cooldown de navegación para evitar movimientos demasiado rápidos
+   */
+  startNavigationCooldown() {
+    this.navigationCooldown = true;
+    this.time.delayedCall(this.navigationRepeatDelay, () => {
+      this.navigationCooldown = false;
     });
   }
 

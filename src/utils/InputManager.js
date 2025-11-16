@@ -54,28 +54,33 @@ export default class InputManager {
 
     events.forEach(event => {
       if (event.type === 'direction') {
-        // Resetear todas las direcciones primero
-        this.state.up = false;
-        this.state.down = false;
-        this.state.left = false;
-        this.state.right = false;
-        
-        switch(event.key) {
-          case 'up':
-            this.state.up = true;
-            break;
-          case 'down':
-            this.state.down = true;
-            break;
-          case 'left':
-            this.state.left = true;
-            break;
-          case 'right':
-            this.state.right = true;
-            break;
-          case 'none':
-            // Centro - todas las direcciones ya están en false
-            break;
+        // Actualizar estado con el objeto completo de direcciones
+        if (event.state) {
+          this.state.up = event.state.up;
+          this.state.down = event.state.down;
+          this.state.left = event.state.left;
+          this.state.right = event.state.right;
+        } else {
+          // Fallback para compatibilidad con formato antiguo
+          this.state.up = false;
+          this.state.down = false;
+          this.state.left = false;
+          this.state.right = false;
+          
+          switch(event.key) {
+            case 'up':
+              this.state.up = true;
+              break;
+            case 'down':
+              this.state.down = true;
+              break;
+            case 'left':
+              this.state.left = true;
+              break;
+            case 'right':
+              this.state.right = true;
+              break;
+          }
         }
       } else if (event.type === 'button') {
         switch(event.key) {

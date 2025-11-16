@@ -64,16 +64,8 @@ export default class GameScene extends Phaser.Scene {
     // Configurar callbacks del controlador Bluetooth
     if (this.bluetoothController) {
       this.bluetoothController.on('data', (events) => {
-        console.log('🎮 GameScene: Callback Bluetooth recibido', {
-          gameOver: this.gameOver,
-          questionActive: this.questionActive,
-          events: events
-        });
         if (!this.gameOver && !this.questionActive) {
-          console.log('✅ GameScene: Actualizando movimiento desde Bluetooth');
           this.inputManager.updateFromBluetooth(events);
-        } else {
-          console.log('⏸️ GameScene: Movimiento bloqueado (gameOver o questionActive)');
         }
       });
 

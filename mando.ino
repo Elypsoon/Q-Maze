@@ -44,8 +44,8 @@ const char* DEVICE_NAME = "Q-MAZE-Controller";
 // --- Umbrales de Control y Tiempos ---
 const int VALOR_CENTRO = 2047; 
 const int UMBRAL_MOVIMIENTO = 900; // Aumentado de 500 a 900 para reducir sensibilidad
-const long TIEMPO_ESPERA_INICIAL_MS = 1000; 
-const long INTERVALO_REPETICION_MS = 200;  
+const long TIEMPO_ESPERA_INICIAL_MS = 100; // Reducido de 1000 a 100ms para respuesta más rápida
+const long INTERVALO_REPETICION_MS = 50;  // Reducido de 200 a 50ms para movimiento más suave
 const long DEBOUNCE_DELAY_MS = 50; 
 const int ESTADO_PRESIONADO = LOW;
 
@@ -337,5 +337,5 @@ void loop() {
   }
   estadoLecturaAnterior_Arcade = lecturaBotonArcade;
   
-  delay(50); 
+  delay(20); // Reducido de 50ms a 20ms para mayor frecuencia de actualización
 }

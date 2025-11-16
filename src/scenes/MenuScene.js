@@ -65,13 +65,31 @@ export default class MenuScene extends Phaser.Scene {
     // Botón de Jugar
     const buttonWidth = Math.min(250, width / 4);
     const buttonHeight = Math.min(60, height / 12);
-    const playButton = this.createButton(width / 2, height * 0.48, 'JUGAR', buttonWidth, buttonHeight, () => {
-      this.scene.start('GameScene', { seed: Date.now() });
+    const playButton = this.createButton(width / 2, height * 0.45, 'JUGAR', buttonWidth, buttonHeight, () => {
+      this.scene.start('GameScene', { 
+        seed: Date.now(),
+        bluetoothController: window.bluetoothController 
+      });
     });
+
+    // Botón de Bluetooth
+    const bluetoothButton = this.createButton(
+      width / 2, 
+      height * 0.56, 
+      'Mando BT', 
+      buttonWidth, 
+      buttonHeight, 
+      () => {
+        this.scene.start('BluetoothSetupScene', { 
+          bluetoothController: window.bluetoothController 
+        });
+      },
+      0x3498db
+    );
 
     // Instrucciones
     const instrSize = Math.min(18, width / 55);
-    const instructions = this.add.text(width / 2, height * 0.65, 
+    const instructions = this.add.text(width / 2, height * 0.68, 
       'Controles: ← ↑ → ↓ para moverte | ESC/P para pausar\n\n' +
       '• Gana puntos al avanzar hacia la meta (máx. 800)\n' +
       '• Responde preguntas para conservar vidas\n' +
@@ -113,11 +131,11 @@ export default class MenuScene extends Phaser.Scene {
     }
   }
 
-  createButton(x, y, text, width, height, callback) {
+  createButton(x, y, text, width, height, callback, color = 0xe94560) {
     const button = this.add.container(x, y);
 
     // Fondo del botón
-    const bg = this.add.rectangle(0, 0, width, height, 0xe94560);
+    const bg = this.add.rectangle(0, 0, width, height, color);
     bg.setStrokeStyle(3, 0x0f3460);
 
     // Texto del botón
@@ -133,9 +151,13 @@ export default class MenuScene extends Phaser.Scene {
     button.setSize(width, height);
     button.setInteractive({ useHandCursor: true });
 
+    // Guardar color original para hover
+    const originalColor = color;
+    const hoverColor = Phaser.Display.Color.IntegerToColor(color).lighten(20).color;
+
     // Efectos hover
     button.on('pointerover', () => {
-      bg.setFillStyle(0xff6b81);
+      bg.setFillStyle(hoverColor);
       this.tweens.add({
         targets: button,
         scaleX: 1.1,
@@ -146,7 +168,7 @@ export default class MenuScene extends Phaser.Scene {
     });
 
     button.on('pointerout', () => {
-      bg.setFillStyle(0xe94560);
+      bg.setFillStyle(originalColor);
       this.tweens.add({
         targets: button,
         scaleX: 1,

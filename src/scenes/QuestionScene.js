@@ -84,7 +84,7 @@ export default class QuestionScene extends Phaser.Scene {
   init(data) {
     this.reason = data.reason || 'general';
     this.onAnswerCallback = data.onAnswer;
-    this.selectedOption = -1;
+    this.selectedOption = 0; // Iniciar en la primera opción
     this.answered = false;
     
     // Configuración de tiempo desde el config (futuro: desde el servidor)
@@ -93,13 +93,67 @@ export default class QuestionScene extends Phaser.Scene {
 
     // Seleccionar pregunta aleatoria
     this.currentQuestion = QUESTION_BANK[Math.floor(Math.random() * QUESTION_BANK.length)];
+    
+    // Controlador Bluetooth
+    this.bluetoothController = data.bluetoothController || window.bluetoothController;
   }
 
   create() {
     this.createQuestionUI();
     
+    // Configurar controles de teclado/mando
+    this.setupControls();
+    
     // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
+  }
+
+  setupControls() {
+    // Teclas de dirección
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    
+    // Teclas numéricas (1-4)
+    this.key1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+    this.key2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+    this.key3 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
+    this.key4 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
+
+    // Configurar callbacks del controlador Bluetooth si existe
+    if (this.bluetoothController) {
+      // Guardar referencia al callback para poder eliminarlo después
+      this.bluetoothDataHandler = (events) => {
+        if (!this.answered) {
+          this.handleBluetoothInput(events);
+        }
+      };
+      this.bluetoothController.on('data', this.bluetoothDataHandler);
+    }
+  }
+
+  handleBluetoothInput(events) {
+    if (!events || this.answered) return;
+
+    events.forEach(event => {
+      if (event.type === 'direction') {
+        // Navegación con el joystick
+        if (event.key === 'up') {
+          console.log('🎮 Mando: ARRIBA');
+          this.moveSelection(-1);
+        } else if (event.key === 'down') {
+          console.log('🎮 Mando: ABAJO');
+          this.moveSelection(1);
+        } else if (event.key === 'none') {
+          console.log('🎮 Mando: CENTRO (reset)');
+        }
+      } else if (event.type === 'button') {
+        if (event.key === 'select') {
+          console.log('🎮 Mando: BOTÓN ARCADE (confirmar)');
+          this.confirmSelection();
+        }
+      }
+    });
   }
 
   createQuestionUI() {
@@ -169,6 +223,11 @@ export default class QuestionScene extends Phaser.Scene {
       );
       this.optionButtons.push(button);
     });
+
+    // Aplicar highlight inicial a la primera opción
+    if (this.optionButtons.length > 0 && !this.answered) {
+      this.updateSelectionHighlight(-1, this.selectedOption);
+    }
 
     // Temporizador de respuesta (tiempo desde configuración)
     const timerSize = Math.min(24, width / 40);
@@ -244,18 +303,18 @@ export default class QuestionScene extends Phaser.Scene {
     // Efectos hover
     container.on('pointerover', () => {
       if (!this.answered) {
-        bg.setFillStyle(0x4a5f7f);
+        this.selectedOption = index;
+        this.updateSelectionHighlight(-1, index);
       }
     });
 
     container.on('pointerout', () => {
-      if (!this.answered && this.selectedOption !== index) {
-        bg.setFillStyle(0x34495e);
-      }
+      // Mantener el highlight si es la opción seleccionada
     });
 
     container.on('pointerdown', () => {
       if (!this.answered) {
+        this.selectedOption = index;
         this.selectAnswer(index, bg);
       }
     });
@@ -263,7 +322,7 @@ export default class QuestionScene extends Phaser.Scene {
     return { container, bg, index };
   }
 
-  selectAnswer(index, clickedBg) {
+  async selectAnswer(index, clickedBg) {
     if (this.answered) return;
 
     this.answered = true;
@@ -274,6 +333,37 @@ export default class QuestionScene extends Phaser.Scene {
     }
 
     const correct = index === this.currentQuestion.correctAnswer;
+
+    // Activar feedback en el ESP32 (LED y sonido)
+    console.log('🎮 Verificando Bluetooth para feedback...');
+    console.log('  - bluetoothController existe:', !!this.bluetoothController);
+    if (this.bluetoothController) {
+      console.log('  - Constructor:', this.bluetoothController.constructor.name);
+      console.log('  - Métodos disponibles:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.bluetoothController)));
+      console.log('  - isConnected existe:', typeof this.bluetoothController.isConnected === 'function');
+      console.log('  - Está conectado:', this.bluetoothController.isConnected());
+      console.log('  - sendCommand existe:', typeof this.bluetoothController.sendCommand === 'function');
+      console.log('  - playCorrectFeedback existe:', typeof this.bluetoothController.playCorrectFeedback === 'function');
+      console.log('  - playIncorrectFeedback existe:', typeof this.bluetoothController.playIncorrectFeedback === 'function');
+    }
+
+    if (this.bluetoothController && this.bluetoothController.isConnected && this.bluetoothController.isConnected()) {
+      try {
+        if (correct) {
+          console.log('✅ Enviando feedback CORRECTO al ESP32...');
+          await this.bluetoothController.playCorrectFeedback();
+          console.log('✅ Feedback CORRECTO enviado');
+        } else {
+          console.log('❌ Enviando feedback INCORRECTO al ESP32...');
+          await this.bluetoothController.playIncorrectFeedback();
+          console.log('❌ Feedback INCORRECTO enviado');
+        }
+      } catch (error) {
+        console.error('❌ Error al enviar feedback a Bluetooth:', error);
+      }
+    } else {
+      console.warn('⚠️ No se puede enviar feedback: Bluetooth no conectado');
+    }
 
     // Colorear las opciones
     this.optionButtons.forEach((btnObj) => {
@@ -326,6 +416,72 @@ export default class QuestionScene extends Phaser.Scene {
     });
   }
 
+  update() {
+    if (this.answered) return;
+
+    // Navegación con teclas de dirección o mando
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+      this.moveSelection(-1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
+      this.moveSelection(1);
+    }
+
+    // Seleccionar con SPACE, ENTER o botón Arcade del mando
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || 
+        Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.confirmSelection();
+    }
+
+    // Teclas numéricas directas (1-4)
+    if (Phaser.Input.Keyboard.JustDown(this.key1)) {
+      this.selectAnswer(0);
+    } else if (Phaser.Input.Keyboard.JustDown(this.key2)) {
+      this.selectAnswer(1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.key3)) {
+      this.selectAnswer(2);
+    } else if (Phaser.Input.Keyboard.JustDown(this.key4)) {
+      this.selectAnswer(3);
+    }
+  }
+
+  moveSelection(direction) {
+    if (this.answered) return;
+
+    const previousOption = this.selectedOption;
+    this.selectedOption += direction;
+
+    // Wrap around
+    if (this.selectedOption < 0) {
+      this.selectedOption = 3;
+    } else if (this.selectedOption > 3) {
+      this.selectedOption = 0;
+    }
+
+    // Actualizar visualmente
+    this.updateSelectionHighlight(previousOption, this.selectedOption);
+  }
+
+  updateSelectionHighlight(previousIndex, currentIndex) {
+    // Quitar highlight del anterior
+    if (previousIndex >= 0 && previousIndex < this.optionButtons.length) {
+      const prevBtn = this.optionButtons[previousIndex];
+      prevBtn.bg.setFillStyle(0x34495e);
+      prevBtn.bg.setStrokeStyle(2, 0x7f8c8d);
+    }
+
+    // Agregar highlight al actual
+    if (currentIndex >= 0 && currentIndex < this.optionButtons.length) {
+      const currBtn = this.optionButtons[currentIndex];
+      currBtn.bg.setFillStyle(0x4a5f7f);
+      currBtn.bg.setStrokeStyle(3, 0x3498db);
+    }
+  }
+
+  confirmSelection() {
+    if (this.answered) return;
+    this.selectAnswer(this.selectedOption);
+  }
+
   resize(gameSize) {
     if (this.answered) {
       return;
@@ -339,5 +495,11 @@ export default class QuestionScene extends Phaser.Scene {
       this.timerEvent.remove();
     }
     this.scale.off('resize', this.resize, this);
+    
+    // Limpiar callback de Bluetooth para no interferir con GameScene
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      console.log('🎮 QuestionScene: Callback Bluetooth eliminado');
+    }
   }
 }

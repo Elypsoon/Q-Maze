@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import MazeGenerator from '../utils/MazeGenerator';
 import { GAME_CONFIG } from './QuestionScene';
+import InputManager from '../utils/InputManager';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -33,6 +34,12 @@ export default class GameScene extends Phaser.Scene {
     
     // Sistema de puntos basado en progreso
     this.visitedCells = new Set(); // Celdas visitadas para no contar dos veces
+    
+    // Controlador Bluetooth
+    this.bluetoothController = data.bluetoothController || window.bluetoothController;
+    
+    // Gestor de entrada unificado
+    this.inputManager = new InputManager(this);
     this.bestDistance = Infinity; // Mejor distancia a la meta
   }
 
@@ -48,12 +55,32 @@ export default class GameScene extends Phaser.Scene {
     // Crear UI
     this.createUI();
 
-    // Configurar controles
+    // Configurar controles de teclado
     this.cursors = this.input.keyboard.createCursorKeys();
-    
-    // Tecla de pausa (ESC o P)
     this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.pauseKeyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+    // Configurar callbacks del controlador Bluetooth
+    if (this.bluetoothController) {
+      this.bluetoothController.on('data', (events) => {
+        console.log('🎮 GameScene: Callback Bluetooth recibido', {
+          gameOver: this.gameOver,
+          questionActive: this.questionActive,
+          events: events
+        });
+        if (!this.gameOver && !this.questionActive) {
+          console.log('✅ GameScene: Actualizando movimiento desde Bluetooth');
+          this.inputManager.updateFromBluetooth(events);
+        } else {
+          console.log('⏸️ GameScene: Movimiento bloqueado (gameOver o questionActive)');
+        }
+      });
+
+      this.bluetoothController.on('disconnect', () => {
+        console.log('Controlador Bluetooth desconectado durante el juego');
+      });
+    }
 
     // Configurar cámara para que siga al jugador pero dentro de los límites del laberinto
     const mazeWidth = this.mazeCols * this.cellSize;
@@ -350,12 +377,19 @@ export default class GameScene extends Phaser.Scene {
       color: '#f39c12'
     });
 
+    // Indicador de Bluetooth
+    this.bluetoothIndicator = this.add.text(panelX + 15, panelY + panelHeight - 35, '', {
+      fontSize: tinyFontSize + 'px',
+      fontFamily: 'Arial',
+      color: '#3498db'
+    });
+
     // Añadir todos los elementos al contenedor
     this.uiContainer.add([
       panel, panelTitle, divider, 
       this.livesText, this.timeText, 
       this.questionTimerText, this.scoreText, 
-      this.invulnerableText
+      this.invulnerableText, this.bluetoothIndicator
     ]);
 
     this.updateUI();
@@ -380,6 +414,15 @@ export default class GameScene extends Phaser.Scene {
       this.invulnerableText.setText(`🛡️ INVULNERABLE`);
     } else {
       this.invulnerableText.setText('');
+    }
+
+    // Actualizar indicador de Bluetooth
+    if (this.bluetoothController && this.bluetoothController.isConnected()) {
+      const deviceInfo = this.bluetoothController.getDeviceInfo();
+      this.bluetoothIndicator.setText(`🎮 ${deviceInfo.name || 'BT'}`);
+      this.bluetoothIndicator.setColor('#2ecc71');
+    } else {
+      this.bluetoothIndicator.setText('');
     }
   }
 
@@ -494,7 +537,8 @@ export default class GameScene extends Phaser.Scene {
     this.scene.pause();
     this.scene.launch('QuestionScene', {
       reason: reason,
-      onAnswer: this.onQuestionAnswered.bind(this)
+      onAnswer: this.onQuestionAnswered.bind(this),
+      bluetoothController: this.bluetoothController
     });
   }
 
@@ -570,13 +614,17 @@ export default class GameScene extends Phaser.Scene {
     this.player.body.setVelocity(0);
 
     // Mostrar mensaje final
+    const controlText = this.bluetoothController && this.bluetoothController.isConnected() 
+      ? 'Presiona ESPACIO o Botón Arcade' 
+      : 'Presiona ESPACIO';
+    
     const finalMessage = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.centerY,
       message + '\n' +
       `Puntuación final: ${this.score} pts\n` +
       `Tiempo usado: ${Math.floor(this.timeElapsed)}s\n\n` +
-      'Presiona ESPACIO para volver al menú',
+      controlText + ' para volver al menú',
       {
         fontSize: '24px',
         fontFamily: 'Arial Black',
@@ -590,11 +638,18 @@ export default class GameScene extends Phaser.Scene {
     finalMessage.setOrigin(0.5);
     finalMessage.setScrollFactor(0);
 
-    // Permitir volver al menú
+    // Permitir volver al menú con SPACE (teclado) o botón Arcade (Bluetooth)
+    this.waitingForReturn = true;
     this.input.keyboard.once('keydown-SPACE', () => {
-      this.scene.stop('QuestionScene');
-      this.scene.start('MenuScene');
+      this.returnToMenu();
     });
+  }
+
+  returnToMenu() {
+    if (!this.waitingForReturn) return;
+    this.waitingForReturn = false;
+    this.scene.stop('QuestionScene');
+    this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
   }
 
   togglePause() {
@@ -782,13 +837,16 @@ export default class GameScene extends Phaser.Scene {
   restartGame() {
     this.hidePauseMenu();
     this.scene.stop('QuestionScene');
-    this.scene.restart({ seed: Date.now() });
+    this.scene.restart({ 
+      seed: Date.now(),
+      bluetoothController: this.bluetoothController 
+    });
   }
 
   exitToMenu() {
     this.hidePauseMenu();
     this.scene.stop('QuestionScene');
-    this.scene.start('MenuScene');
+    this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
   }
 
   calculateManhattanDistance(x1, y1, x2, y2) {
@@ -846,8 +904,17 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    // Verificar tecla de pausa
-    if (Phaser.Input.Keyboard.JustDown(this.pauseKey) || Phaser.Input.Keyboard.JustDown(this.pauseKeyP)) {
+    // Actualizar estado de entrada desde teclado
+    this.inputManager.updateFromKeyboard(this.cursors, this.spaceKey, this.pauseKey, this.pauseKeyP);
+    
+    // Si el juego terminó, esperar botón para volver al menú
+    if (this.gameOver && this.waitingForReturn && this.inputManager.isSelectPressed()) {
+      this.returnToMenu();
+      return;
+    }
+    
+    // Verificar tecla de pausa (funciona con teclado o Bluetooth)
+    if (this.inputManager.isPausePressed()) {
       this.togglePause();
       return;
     }
@@ -860,22 +927,14 @@ export default class GameScene extends Phaser.Scene {
     // Actualizar puntos basados en progreso
     this.updateProgressScore();
 
-    // Movimiento del jugador
+    // Movimiento del jugador usando InputManager
     const speed = 150;
-
-    this.player.body.setVelocity(0);
-
-    if (this.cursors.left.isDown) {
-      this.player.body.setVelocityX(-speed);
-    } else if (this.cursors.right.isDown) {
-      this.player.body.setVelocityX(speed);
-    }
-
-    if (this.cursors.up.isDown) {
-      this.player.body.setVelocityY(-speed);
-    } else if (this.cursors.down.isDown) {
-      this.player.body.setVelocityY(speed);
-    }
+    
+    // Obtener velocidades desde el InputManager (funciona con teclado y Bluetooth)
+    const velocityX = this.inputManager.getVelocityX(speed);
+    const velocityY = this.inputManager.getVelocityY(speed);
+    
+    this.player.body.setVelocity(velocityX, velocityY);
   }
 
   resize(gameSize) {

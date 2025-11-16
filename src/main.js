@@ -2,6 +2,11 @@ import Phaser from "phaser";
 import MenuScene from "./scenes/MenuScene";
 import GameScene from "./scenes/GameScene";
 import QuestionScene from "./scenes/QuestionScene";
+import BluetoothSetupScene from "./scenes/BluetoothSetupScene";
+import BluetoothController from "./services/BluetoothController";
+
+// Crear instancia global del controlador Bluetooth
+window.bluetoothController = new BluetoothController();
 
 const config = {
   type: Phaser.WEBGL,
@@ -14,7 +19,7 @@ const config = {
     // Obtiene la mejor resolución posible según el dispositivo
     resolution: Math.max(2, window.devicePixelRatio || 2),
   },
-  scene: [MenuScene, GameScene, QuestionScene],
+  scene: [MenuScene, GameScene, QuestionScene, BluetoothSetupScene],
   physics: {
     default: "arcade",
     arcade: {

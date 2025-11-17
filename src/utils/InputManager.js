@@ -23,6 +23,30 @@ export default class InputManager {
     
     // Timestamp del último input de Bluetooth
     this.lastBluetoothUpdate = 0;
+    
+    // Sistema de aceleración gradual para movimiento fino
+    this.directionStartTime = {
+      up: 0,
+      down: 0,
+      left: 0,
+      right: 0
+    };
+    
+    // Timestamps de última actualización por dirección (para auto-reset)
+    this.directionLastUpdate = {
+      up: 0,
+      down: 0,
+      left: 0,
+      right: 0
+    };
+    
+    // Configuración de aceleración
+    this.minSpeed = 100;
+    this.maxSpeed = 150;
+    this.accelerationTime = 100; // Tiempo en ms para llegar a velocidad máxima
+    
+    // Timeout para auto-reset de direcciones (si no hay actualización en este tiempo, resetear)
+    this.directionTimeout = 80;
   }
 
   /**
@@ -33,6 +57,19 @@ export default class InputManager {
     const now = Date.now();
     if (now - this.lastBluetoothUpdate > 500) {
       this.inputSource = 'keyboard';
+      
+      // Trackear tiempo de inicio de cada dirección para aceleración
+      ['up', 'down', 'left', 'right'].forEach(dir => {
+        const isDown = cursors[dir].isDown;
+        if (isDown && !this.state[dir]) {
+          // Dirección recién activada
+          this.directionStartTime[dir] = now;
+        } else if (!isDown && this.state[dir]) {
+          // Dirección recién desactivada
+          this.directionStartTime[dir] = 0;
+        }
+      });
+      
       this.state.up = cursors.up.isDown;
       this.state.down = cursors.down.isDown;
       this.state.left = cursors.left.isDown;
@@ -53,35 +90,31 @@ export default class InputManager {
     this.lastBluetoothUpdate = Date.now();
 
     events.forEach(event => {
-      if (event.type === 'direction') {
+      if (event.type === 'direction' && event.state) {
         // Actualizar estado con el objeto completo de direcciones
-        if (event.state) {
-          this.state.up = event.state.up;
-          this.state.down = event.state.down;
-          this.state.left = event.state.left;
-          this.state.right = event.state.right;
-        } else {
-          // Fallback para compatibilidad con formato antiguo
-          this.state.up = false;
-          this.state.down = false;
-          this.state.left = false;
-          this.state.right = false;
-          
-          switch(event.key) {
-            case 'up':
-              this.state.up = true;
-              break;
-            case 'down':
-              this.state.down = true;
-              break;
-            case 'left':
-              this.state.left = true;
-              break;
-            case 'right':
-              this.state.right = true;
-              break;
+        const now = Date.now();
+        
+        // Trackear tiempo de inicio de cada dirección para aceleración
+        ['up', 'down', 'left', 'right'].forEach(dir => {
+          if (event.state[dir] && !this.state[dir]) {
+            // Dirección recién activada
+            this.directionStartTime[dir] = now;
+          } else if (!event.state[dir] && this.state[dir]) {
+            // Dirección recién desactivada
+            this.directionStartTime[dir] = 0;
           }
-        }
+          
+          // Actualizar timestamp de última actualización si está activa
+          if (event.state[dir]) {
+            this.directionLastUpdate[dir] = now;
+          }
+        });
+        
+        this.state.up = event.state.up;
+        this.state.down = event.state.down;
+        this.state.left = event.state.left;
+        this.state.right = event.state.right;
+        
       } else if (event.type === 'button') {
         switch(event.key) {
           case 'select':
@@ -125,27 +158,83 @@ export default class InputManager {
   }
 
   /**
-   * Obtiene la velocidad en X basada en las entradas
+   * Obtiene la velocidad en X basada en las entradas con aceleración gradual
    */
-  getVelocityX(speed) {
+  getVelocityX(baseSpeed) {
+    const now = Date.now();
+    
+    // Auto-reset de direcciones si no hay actualización reciente (solo para Bluetooth)
+    if (this.inputSource === 'bluetooth') {
+      this.checkDirectionTimeout(now);
+    }
+    
     if (this.state.left && !this.state.right) {
+      const speed = this.calculateAcceleratedSpeed('left', now, baseSpeed);
       return -speed;
     } else if (this.state.right && !this.state.left) {
+      const speed = this.calculateAcceleratedSpeed('right', now, baseSpeed);
       return speed;
     }
     return 0;
   }
 
   /**
-   * Obtiene la velocidad en Y basada en las entradas
+   * Obtiene la velocidad en Y basada en las entradas con aceleración gradual
    */
-  getVelocityY(speed) {
+  getVelocityY(baseSpeed) {
+    const now = Date.now();
+    
+    // Auto-reset de direcciones si no hay actualización reciente (solo para Bluetooth)
+    if (this.inputSource === 'bluetooth') {
+      this.checkDirectionTimeout(now);
+    }
+    
     if (this.state.up && !this.state.down) {
+      const speed = this.calculateAcceleratedSpeed('up', now, baseSpeed);
       return -speed;
     } else if (this.state.down && !this.state.up) {
+      const speed = this.calculateAcceleratedSpeed('down', now, baseSpeed);
       return speed;
     }
     return 0;
+  }
+  
+  /**
+   * Calcula la velocidad con aceleración gradual
+   */
+  calculateAcceleratedSpeed(direction, now, maxSpeed) {
+    const startTime = this.directionStartTime[direction];
+    if (startTime === 0) return this.minSpeed;
+    
+    const elapsed = now - startTime;
+    
+    // Si aún no ha pasado el tiempo de aceleración
+    if (elapsed < this.accelerationTime) {
+      // Interpolación lineal de minSpeed a maxSpeed
+      const progress = elapsed / this.accelerationTime;
+      return this.minSpeed + (maxSpeed - this.minSpeed) * progress;
+    }
+    
+    // Ya alcanzó la velocidad máxima
+    return maxSpeed;
+  }
+  
+  /**
+   * Verifica y resetea direcciones que no han recibido actualización reciente
+   * Esto evita que un toque rápido se convierta en movimiento prolongado
+   */
+  checkDirectionTimeout(now) {
+    ['up', 'down', 'left', 'right'].forEach(dir => {
+      if (this.state[dir]) {
+        const timeSinceUpdate = now - this.directionLastUpdate[dir];
+        if (timeSinceUpdate > this.directionTimeout) {
+          // No hay actualización reciente, resetear esta dirección
+          this.state[dir] = false;
+          this.directionStartTime[dir] = 0;
+          this.directionLastUpdate[dir] = 0;
+        }
+      }
+    });
   }
 
   /**

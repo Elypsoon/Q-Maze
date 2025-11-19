@@ -171,15 +171,8 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    const mazeWidth = this.mazeCols * this.cellSize;
-    const mazeHeight = this.mazeRows * this.cellSize;
-    this.cameras.main.setBounds(
-      this.mazeOffsetX,
-      this.mazeOffsetY,
-      mazeWidth,
-      mazeHeight
-    );
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    // Cámara estática centrada en la pantalla
+    this.cameras.main.setScroll(0, 0);
 
     this.startTimers();
     

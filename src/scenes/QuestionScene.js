@@ -228,8 +228,8 @@ export default class QuestionScene extends Phaser.Scene {
     // Panel de pregunta - adaptativo
     const panelWidth = Math.min(700, width * 0.85);
     const panelHeight = Math.min(500, height * 0.75);
-    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2c3e50);
-    panel.setStrokeStyle(4, 0xe74c3c);
+    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2d3436);
+    panel.setStrokeStyle(4, 0x6c5ce7);
 
     // Título según la razón
     const reasons = {
@@ -242,7 +242,7 @@ export default class QuestionScene extends Phaser.Scene {
     const title = this.add.text(width / 2, height * 0.2, reasons[this.reason] || '❓ Pregunta', {
       fontSize: titleSize + 'px',
       fontFamily: 'Arial Black',
-      color: '#e74c3c'
+      color: '#a29bfe'
     });
     title.setOrigin(0.5);
 
@@ -331,8 +331,8 @@ export default class QuestionScene extends Phaser.Scene {
     const container = this.add.container(x, y);
 
     // Fondo del botón
-    const bg = this.add.rectangle(0, 0, width, height, 0x34495e);
-    bg.setStrokeStyle(2, 0x7f8c8d);
+    const bg = this.add.rectangle(0, 0, width, height, 0x353b48);
+    bg.setStrokeStyle(2, 0x6c5ce7);
 
     // Letra de la opción
     const letters = ['A', 'B', 'C', 'D'];
@@ -340,7 +340,7 @@ export default class QuestionScene extends Phaser.Scene {
     const letter = this.add.text(-width / 2 + 30, 0, letters[index], {
       fontSize: letterSize + 'px',
       fontFamily: 'Arial Black',
-      color: '#3498db'
+      color: '#a29bfe'
     });
     letter.setOrigin(0.5);
 
@@ -562,15 +562,15 @@ export default class QuestionScene extends Phaser.Scene {
     // Quitar highlight del anterior
     if (previousIndex >= 0 && previousIndex < this.optionButtons.length) {
       const prevBtn = this.optionButtons[previousIndex];
-      prevBtn.bg.setFillStyle(0x34495e);
-      prevBtn.bg.setStrokeStyle(2, 0x7f8c8d);
+      prevBtn.bg.setFillStyle(0x353b48);
+      prevBtn.bg.setStrokeStyle(2, 0x6c5ce7);
     }
 
     // Agregar highlight al actual
     if (currentIndex >= 0 && currentIndex < this.optionButtons.length) {
       const currBtn = this.optionButtons[currentIndex];
-      currBtn.bg.setFillStyle(0x4a5f7f);
-      currBtn.bg.setStrokeStyle(3, 0x3498db);
+      currBtn.bg.setFillStyle(0x4a5a6f);
+      currBtn.bg.setStrokeStyle(3, 0xa29bfe);
     }
   }
 

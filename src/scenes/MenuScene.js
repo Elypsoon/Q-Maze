@@ -37,9 +37,9 @@ export default class MenuScene extends Phaser.Scene {
     // Contenedor para todos los elementos del menú
     this.menuContainer = this.add.container(0, 0);
 
-    // Fondo con gradiente simulado
+    // Fondo con gradiente moderno (azul oscuro a morado)
     const graphics = this.add.graphics();
-    graphics.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e, 1);
+    graphics.fillGradientStyle(0x0f0c29, 0x302b63, 0x24243e, 0x302b63, 1);
     graphics.fillRect(0, 0, width, height);
     this.menuContainer.add(graphics);
 
@@ -48,18 +48,26 @@ export default class MenuScene extends Phaser.Scene {
     const title = this.add.text(width / 2, height * 0.15, 'Q-MAZE', {
       fontSize: titleSize + 'px',
       fontFamily: 'Arial Black',
-      color: '#0f3460',
-      stroke: '#e94560',
-      strokeThickness: 8
+      color: '#ffffff',
+      stroke: '#6c5ce7',
+      strokeThickness: 8,
+      shadow: {
+        offsetX: 3,
+        offsetY: 3,
+        color: '#000000',
+        blur: 8,
+        fill: true
+      }
     });
     title.setOrigin(0.5);
 
     // Subtítulo
     const subtitleSize = Math.min(36, width / 25);
-    const subtitle = this.add.text(width / 2, height * 0.25, 'Laberinto con trivia', {
+    const subtitle = this.add.text(width / 2, height * 0.25, 'Laberinto Educativo', {
       fontSize: subtitleSize + 'px',
       fontFamily: 'Arial',
-      color: '#f1f1f1'
+      color: '#a29bfe',
+      fontStyle: 'italic'
     });
     subtitle.setOrigin(0.5);
 
@@ -212,6 +220,9 @@ export default class MenuScene extends Phaser.Scene {
       buttonWidth, 
       buttonHeight, 
       () => {
+        // Limpiar el input antes de cambiar de escena
+        this.cleanupNameInput();
+        
         this.scene.start('BluetoothSetupScene', { 
           bluetoothController: window.bluetoothController 
         });
@@ -277,39 +288,49 @@ export default class MenuScene extends Phaser.Scene {
     this.cleanupNameInput();
   }
 
-  createButton(x, y, text, width, height, callback, color = 0xe94560) {
+  createButton(x, y, text, width, height, callback, color = 0x6c5ce7) {
     const button = this.add.container(x, y);
 
-    // Fondo del botón
+    // Fondo del botón con sombra
+    const shadow = this.add.rectangle(2, 2, width, height, 0x000000, 0.3);
+    shadow.setOrigin(0.5);
+    
     const bg = this.add.rectangle(0, 0, width, height, color);
-    bg.setStrokeStyle(3, 0x0f3460);
+    bg.setStrokeStyle(3, 0xffffff, 0.3);
 
     // Texto del botón
-    const buttonTextSize = Math.min(36, width / 7);
+    const buttonTextSize = Math.min(32, width / 7.5);
     const buttonText = this.add.text(0, 0, text, {
       fontSize: buttonTextSize + 'px',
       fontFamily: 'Arial Black',
-      color: '#ffffff'
+      color: '#ffffff',
+      shadow: {
+        offsetX: 1,
+        offsetY: 1,
+        color: '#000000',
+        blur: 2,
+        fill: true
+      }
     });
     buttonText.setOrigin(0.5);
 
-    button.add([bg, buttonText]);
+    button.add([shadow, bg, buttonText]);
     button.setSize(width, height);
     button.setInteractive({ useHandCursor: true });
 
     // Guardar color original para hover
     const originalColor = color;
-    const hoverColor = Phaser.Display.Color.IntegerToColor(color).lighten(20).color;
+    const hoverColor = Phaser.Display.Color.IntegerToColor(color).lighten(30).color;
 
     // Efectos hover
     button.on('pointerover', () => {
       bg.setFillStyle(hoverColor);
       this.tweens.add({
         targets: button,
-        scaleX: 1.1,
-        scaleY: 1.1,
-        duration: 100,
-        ease: 'Power2'
+        scaleX: 1.08,
+        scaleY: 1.08,
+        duration: 150,
+        ease: 'Back.easeOut'
       });
     });
 
@@ -319,8 +340,8 @@ export default class MenuScene extends Phaser.Scene {
         targets: button,
         scaleX: 1,
         scaleY: 1,
-        duration: 100,
-        ease: 'Power2'
+        duration: 150,
+        ease: 'Back.easeIn'
       });
     });
 

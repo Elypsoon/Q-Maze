@@ -310,6 +310,7 @@ export default class GameScene extends Phaser.Scene {
         // Dibujar las paredes
         const wallThickness = 4; // Hitbox delgada para margen de error
         const wallVisualThickness = 6; // Visual más grueso para mejor visibilidad
+        const wallColor = 0x6c5ce7; // Color morado vibrante
         
         if (cell.walls.top) {
           // Crear visual de pared (más gruesa)
@@ -318,7 +319,7 @@ export default class GameScene extends Phaser.Scene {
             y,
             this.cellSize,
             wallVisualThickness,
-            0xe74c3c
+            wallColor
           );
           
           // Crear hitbox de pared (más delgada para dar margen)
@@ -327,7 +328,7 @@ export default class GameScene extends Phaser.Scene {
             y,
             this.cellSize,
             wallThickness,
-            0xe74c3c,
+            wallColor,
             0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
@@ -341,7 +342,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize / 2,
             wallVisualThickness,
             this.cellSize,
-            0xe74c3c
+            wallColor
           );
           
           // Crear hitbox de pared (más delgada para dar margen)
@@ -350,7 +351,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize / 2,
             wallThickness,
             this.cellSize,
-            0xe74c3c,
+            wallColor,
             0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
@@ -364,7 +365,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize,
             this.cellSize,
             wallVisualThickness,
-            0xe74c3c
+            wallColor
           );
           
           // Crear hitbox de pared (más delgada para dar margen)
@@ -373,7 +374,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize,
             this.cellSize,
             wallThickness,
-            0xe74c3c,
+            wallColor,
             0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
@@ -387,7 +388,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize / 2,
             wallVisualThickness,
             this.cellSize,
-            0xe74c3c
+            wallColor
           );
           
           // Crear hitbox de pared (más delgada para dar margen)
@@ -396,7 +397,7 @@ export default class GameScene extends Phaser.Scene {
             y + this.cellSize / 2,
             wallThickness,
             this.cellSize,
-            0xe74c3c,
+            wallColor,
             0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
@@ -405,7 +406,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Marcar el inicio (verde)
+    // Marcar el inicio (verde brillante)
     const startX = this.mazeOffsetX + this.cellSize / 2;
     const startY = this.mazeOffsetY + this.cellSize / 2;
     const start = this.add.rectangle(
@@ -413,7 +414,7 @@ export default class GameScene extends Phaser.Scene {
       startY,
       this.cellSize - 4,
       this.cellSize - 4,
-      0x2ecc71
+      0x00b894
     );
     this.add.text(startX, startY, 'INICIO', {
       fontSize: Math.max(14, this.cellSize / 3.5) + 'px',
@@ -421,7 +422,7 @@ export default class GameScene extends Phaser.Scene {
       color: '#ffffff'
     }).setOrigin(0.5);
 
-    // Marcar el final (amarillo)
+    // Marcar el final (dorado vibrante)
     const endX = this.mazeOffsetX + (this.mazeCols - 1) * this.cellSize + this.cellSize / 2;
     const endY = this.mazeOffsetY + (this.mazeRows - 1) * this.cellSize + this.cellSize / 2;
     this.goal = this.add.rectangle(
@@ -429,7 +430,7 @@ export default class GameScene extends Phaser.Scene {
       endY,
       this.cellSize - 4,
       this.cellSize - 4,
-      0xf39c12
+      0xfdcb6e
     );
     this.add.text(endX, endY, 'META', {
       fontSize: Math.max(14, this.cellSize / 3.5) + 'px',
@@ -489,10 +490,10 @@ export default class GameScene extends Phaser.Scene {
       panelY + panelHeight / 2,
       panelWidth,
       panelHeight,
-      0x2c3e50,
+      0x2d3436,
       0.95
     );
-    panel.setStrokeStyle(3, 0xe74c3c);
+    panel.setStrokeStyle(3, 0x6c5ce7);
 
     // Tamaños de fuente adaptativos - Aumentados
     const titleFontSize = Math.min(26, width * 0.024);
@@ -514,7 +515,7 @@ export default class GameScene extends Phaser.Scene {
       panelY + 50,
       panelWidth - 20,
       2,
-      0x7f8c8d
+      0xa29bfe
     );
 
     // Textos de estadísticas
@@ -916,14 +917,14 @@ export default class GameScene extends Phaser.Scene {
     this.pauseContainer.setDepth(10000);
     
     // Overlay oscuro
-    const overlay = this.add.rectangle(0, 0, width * 2, height * 2, 0x000000, 0.8);
-    overlay.setOrigin(0, 0);
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
+    overlay.setOrigin(0.5);
     
     // Panel del menú
     const panelWidth = Math.min(500, width * 0.8);
     const panelHeight = Math.min(450, height * 0.7);
-    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2c3e50);
-    panel.setStrokeStyle(4, 0xe74c3c);
+    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2d3436);
+    panel.setStrokeStyle(4, 0x6c5ce7);
     
     // Título
     const titleSize = Math.min(48, width / 20);

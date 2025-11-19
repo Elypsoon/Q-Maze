@@ -1,8 +1,18 @@
 import Phaser from 'phaser';
+import { DIFFICULTY_LEVELS, GAME_CONFIG } from '../config/gameConfig';
 
 export default class MenuScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MenuScene' });
+  }
+
+  init(data) {
+    // Inicializar el nivel de dificultad seleccionado (por defecto medio)
+    this.selectedDifficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
+    this.bluetoothController = data.bluetoothController || window.bluetoothController;
+    
+    // Nombre del jugador por defecto
+    this.playerName = 'Runner';
   }
 
   create() {
@@ -17,6 +27,9 @@ export default class MenuScene extends Phaser.Scene {
     if (this.menuContainer) {
       this.menuContainer.destroy();
     }
+    
+    // Limpiar input HTML anterior si existe
+    this.cleanupNameInput();
 
     const width = this.scale.width;
     const height = this.scale.height;
@@ -62,29 +75,139 @@ export default class MenuScene extends Phaser.Scene {
     });
     description.setOrigin(0.5);
 
-    // Botón de Jugar
-    const buttonWidth = Math.min(250, width / 4);
-    const buttonHeight = Math.min(60, height / 12);
-    const playButton = this.createButton(width / 2, height * 0.45, 'JUGAR', buttonWidth, buttonHeight, () => {
-      
-      // Implementación del PROMPT 
-      let playerName = prompt("Ingresa tu nombre para el registro de puntuaciones:");
-      
-      // Si el usuario no ingresa nada o solo espacios, usamos 'Invitado'
-      if (!playerName || playerName.trim() === '') {
-        playerName = 'Invitado';
+    // Selector de dificultad
+    const diffSize = Math.min(26, width / 38);
+    const diffLabel = this.add.text(width / 2, height * 0.43, 'Dificultad:', {
+      fontSize: diffSize + 'px',
+      fontFamily: 'Arial Black',
+      color: '#ecf0f1'
+    });
+    diffLabel.setOrigin(0.5);
+
+    // Botones de dificultad
+    const diffButtonWidth = Math.min(120, width / 8);
+    const diffButtonHeight = Math.min(50, height / 15);
+    const diffButtonY = height * 0.51;
+    const spacing = diffButtonWidth + 20;
+    
+    // Calcular posición inicial para centrar los 3 botones
+    const startX = width / 2 - spacing;
+    
+    // Botón Fácil
+    this.easyButton = this.createDifficultyButton(
+      startX, 
+      diffButtonY, 
+      'Fácil', 
+      DIFFICULTY_LEVELS.EASY,
+      diffButtonWidth, 
+      diffButtonHeight
+    );
+    
+    // Botón Medio
+    this.mediumButton = this.createDifficultyButton(
+      startX + spacing, 
+      diffButtonY, 
+      'Medio', 
+      DIFFICULTY_LEVELS.MEDIUM,
+      diffButtonWidth, 
+      diffButtonHeight
+    );
+    
+    // Botón Difícil
+    this.hardButton = this.createDifficultyButton(
+      startX + spacing * 2, 
+      diffButtonY, 
+      'Difícil', 
+      DIFFICULTY_LEVELS.HARD,
+      diffButtonWidth, 
+      diffButtonHeight
+    );
+
+    // Descripción de la dificultad seleccionada
+    const diffDescSize = Math.min(16, width / 60);
+    const selectedConfig = GAME_CONFIG[this.selectedDifficulty];
+    this.difficultyDescription = this.add.text(
+      width / 2, 
+      height * 0.59, 
+      selectedConfig.DIFFICULTY_DESCRIPTION, 
+      {
+        fontSize: diffDescSize + 'px',
+        fontFamily: 'Arial',
+        color: '#95a5a6',
+        align: 'center',
+        wordWrap: { width: width * 0.8 }
       }
+    );
+    this.difficultyDescription.setOrigin(0.5);
+
+    // Campo de nombre del jugador (en la misma línea)
+    const nameSize = Math.min(18, width / 50);
+    const nameLabel = this.add.text(width / 2 - 140, height * 0.68, 'Nombre:', {
+      fontSize: nameSize + 'px',
+      fontFamily: 'Arial',
+      color: '#ecf0f1'
+    });
+    nameLabel.setOrigin(0.5);
+
+    // Input HTML para el nombre (más pequeño y en la misma línea)
+    const inputWidth = Math.min(200, width * 0.25);
+    const inputHeight = Math.min(34, height / 24);
+    
+    // Crear un elemento HTML input
+    const inputElement = document.createElement('input');
+    inputElement.type = 'text';
+    inputElement.id = 'playerNameInput';
+    inputElement.value = this.playerName;
+    inputElement.placeholder = 'Runner';
+    inputElement.maxLength = 20;
+    inputElement.style.position = 'absolute';
+    inputElement.style.left = `${(width / 2) - 20}px`;
+    inputElement.style.top = `${height * 0.68 - (inputHeight / 2)}px`;
+    inputElement.style.width = `${inputWidth}px`;
+    inputElement.style.height = `${inputHeight}px`;
+    inputElement.style.fontSize = `${Math.min(16, width / 60)}px`;
+    inputElement.style.fontFamily = 'Arial';
+    inputElement.style.padding = '8px';
+    inputElement.style.border = '2px solid #3498db';
+    inputElement.style.borderRadius = '5px';
+    inputElement.style.backgroundColor = '#2c3e50';
+    inputElement.style.color = '#ecf0f1';
+    inputElement.style.textAlign = 'center';
+    inputElement.style.outline = 'none';
+    inputElement.style.zIndex = '1000';
+    
+    // Agregar evento para actualizar el nombre
+    inputElement.addEventListener('input', (e) => {
+      this.playerName = e.target.value.trim() || 'Runner';
+    });
+    
+    // Agregar al DOM
+    document.body.appendChild(inputElement);
+    
+    // Guardar referencia para limpieza
+    this.nameInput = inputElement;
+
+    // Botón de Jugar
+    const buttonWidth = Math.min(240, width / 4.5);
+    const buttonHeight = Math.min(55, height / 13);
+    const playButton = this.createButton(width / 2, height * 0.78, 'JUGAR', buttonWidth, buttonHeight, () => {
+      // Usar el nombre ingresado en el input
+      const playerName = this.playerName || 'Runner';
+      
+      // Limpiar el input antes de cambiar de escena
+      this.cleanupNameInput();
 
       this.scene.start('GameScene', { 
         seed: Date.now(),
         bluetoothController: window.bluetoothController,
-        playerName: playerName // PASA EL NOMBRE AL INICIAR GameScene
+        playerName: playerName, // PASA EL NOMBRE AL INICIAR GameScene
+        difficulty: this.selectedDifficulty // PASA LA DIFICULTAD SELECCIONADA
       });
     });
     // Botón de Bluetooth
     const bluetoothButton = this.createButton(
       width / 2, 
-      height * 0.56, 
+      height * 0.86, 
       'Mando BT', 
       buttonWidth, 
       buttonHeight, 
@@ -97,23 +220,20 @@ export default class MenuScene extends Phaser.Scene {
     );
 
     // Instrucciones
-    const instrSize = Math.min(18, width / 55);
-    const instructions = this.add.text(width / 2, height * 0.68, 
-      'Controles: ← ↑ → ↓ para moverte | ESC/P para pausar\n\n' +
-      '• Gana puntos al avanzar hacia la meta (máx. 800)\n' +
-      '• Responde preguntas para conservar vidas\n' +
-      '• Bonificaciones al completar: tiempo y vidas restantes\n' +
-      '• ¡Completa el laberinto rápido para máxima puntuación!', {
+    const instrSize = Math.min(14, width / 65);
+    const instructions = this.add.text(width / 2, height * 0.94, 
+      'Controles: ← ↑ → ↓ para moverte | ESC/P para pausar\n' +
+      'Gana puntos al avanzar y completar. ¡Responde bien para conservar vidas!', {
       fontSize: instrSize + 'px',
       fontFamily: 'Arial',
-      color: '#95a5a6',
+      color: '#7f8c8d',
       align: 'center',
-      lineSpacing: 5
+      lineSpacing: 3
     });
     instructions.setOrigin(0.5);
 
-    // Agregar elementos al contenedor
-    this.menuContainer.add([title, subtitle, description, instructions]);
+    // Agregar elementos al contenedor (no el input HTML, ese está en el DOM)
+    this.menuContainer.add([title, subtitle, description, diffLabel, nameLabel, this.difficultyDescription, instructions]);
 
     // Animación de parpadeo en el título
     this.titleTween = this.tweens.add({
@@ -131,6 +251,20 @@ export default class MenuScene extends Phaser.Scene {
     // Recrear el menú con las nuevas dimensiones
     this.createMenu();
   }
+  
+  cleanupNameInput() {
+    // Limpiar input HTML si existe
+    if (this.nameInput) {
+      this.nameInput.remove();
+      this.nameInput = null;
+    }
+    
+    // También limpiar por ID por si quedó huérfano
+    const existingInput = document.getElementById('playerNameInput');
+    if (existingInput) {
+      existingInput.remove();
+    }
+  }
 
   shutdown() {
     // Limpiar el listener cuando se cierre la escena
@@ -138,6 +272,9 @@ export default class MenuScene extends Phaser.Scene {
     if (this.titleTween) {
       this.titleTween.remove();
     }
+    
+    // Limpiar input HTML
+    this.cleanupNameInput();
   }
 
   createButton(x, y, text, width, height, callback, color = 0xe94560) {
@@ -199,5 +336,96 @@ export default class MenuScene extends Phaser.Scene {
     });
 
     return button;
+  }
+
+  createDifficultyButton(x, y, text, difficulty, width, height) {
+    const config = GAME_CONFIG[difficulty];
+    const isSelected = this.selectedDifficulty === difficulty;
+    
+    // Obtener color según la dificultad
+    const color = Phaser.Display.Color.HexStringToColor(config.DIFFICULTY_COLOR).color;
+    const button = this.add.container(x, y);
+
+    // Fondo del botón
+    const bg = this.add.rectangle(0, 0, width, height, color);
+    bg.setStrokeStyle(isSelected ? 5 : 2, 0xffffff);
+    bg.setAlpha(isSelected ? 1 : 0.7);
+
+    // Texto del botón
+    const buttonTextSize = Math.min(22, width / 5);
+    const buttonText = this.add.text(0, 0, text, {
+      fontSize: buttonTextSize + 'px',
+      fontFamily: 'Arial Black',
+      color: '#ffffff'
+    });
+    buttonText.setOrigin(0.5);
+
+    button.add([bg, buttonText]);
+    button.setSize(width, height);
+    button.setInteractive({ useHandCursor: true });
+
+    // Guardar referencias para actualizar después
+    button.bg = bg;
+    button.difficulty = difficulty;
+    button.defaultAlpha = isSelected ? 1 : 0.7;
+
+    // Efectos hover
+    button.on('pointerover', () => {
+      bg.setAlpha(1);
+      this.tweens.add({
+        targets: button,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 100,
+        ease: 'Power2'
+      });
+    });
+
+    button.on('pointerout', () => {
+      const isCurrentlySelected = this.selectedDifficulty === difficulty;
+      bg.setAlpha(isCurrentlySelected ? 1 : 0.7);
+      this.tweens.add({
+        targets: button,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 100,
+        ease: 'Power2'
+      });
+    });
+
+    button.on('pointerdown', () => {
+      this.tweens.add({
+        targets: button,
+        scaleX: 0.95,
+        scaleY: 0.95,
+        duration: 50,
+        yoyo: true,
+        onComplete: () => {
+          this.selectDifficulty(difficulty);
+        }
+      });
+    });
+
+    this.menuContainer.add(button);
+    return button;
+  }
+
+  selectDifficulty(difficulty) {
+    this.selectedDifficulty = difficulty;
+    
+    // Actualizar apariencia de todos los botones
+    [this.easyButton, this.mediumButton, this.hardButton].forEach(btn => {
+      if (btn) {
+        const isSelected = btn.difficulty === difficulty;
+        btn.bg.setStrokeStyle(isSelected ? 5 : 2, 0xffffff);
+        btn.bg.setAlpha(isSelected ? 1 : 0.7);
+      }
+    });
+    
+    // Actualizar descripción
+    const selectedConfig = GAME_CONFIG[difficulty];
+    if (this.difficultyDescription) {
+      this.difficultyDescription.setText(selectedConfig.DIFFICULTY_DESCRIPTION);
+    }
   }
 }

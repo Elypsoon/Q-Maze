@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import MazeGenerator from '../utils/MazeGenerator';
 import InputManager from '../utils/InputManager';
+import { DIFFICULTY_LEVELS, getConfigForDifficulty } from '../config/gameConfig';
 
 // URL base del backend (puerto 3000)
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -11,23 +12,27 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init(data) {
+    // Obtener configuración del nivel de dificultad seleccionado
+    const difficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
+    this.localConfig = getConfigForDifficulty(difficulty);
+    
     // Parámetros del juego
     this.seed = data.seed || Date.now();
-    this.lives = 3;
+    this.lives = this.localConfig.LIVES;
     this.score = 0;
     
     // --- Historial de respuestas ---
     this.playerName = data.playerName || 'Invitado'; // Obtiene el nombre
     this.sessionAnswers = []; // Array para almacenar las respuestas
 
-    // Configuración del tamaño del laberinto
-    this.mazeRows = 20;
-    this.mazeCols = 20;
-    this.cellSize = 40;
+    // Configuración del tamaño del laberinto (desde config local)
+    this.mazeRows = this.localConfig.MAZE_ROWS;
+    this.mazeCols = this.localConfig.MAZE_COLS;
+    this.cellSize = this.localConfig.CELL_SIZE;
     
-    // Temporizadores
-    this.totalTimeLimit = 300; // 5 minutos en segundos
-    this.questionTimeInterval = 20; // Cada 20 segundos lanza pregunta
+    // Temporizadores (desde config local)
+    this.totalTimeLimit = this.localConfig.TOTAL_TIME_LIMIT;
+    this.questionTimeInterval = this.localConfig.QUESTION_TIME_INTERVAL;
     this.timeElapsed = 0;
     this.timeSinceLastQuestion = 0;
     
@@ -42,7 +47,7 @@ export default class GameScene extends Phaser.Scene {
     this.visitedCells = new Set(); // Celdas visitadas para no contar dos veces
 
     // Backend Data
-    this.gameConfig = null; // Se cargará desde /api/config
+    this.gameConfig = null; // Se cargará desde /api/config (para complementar)
     this.questionsBank = []; // Se cargará desde /api/questions
     this.questionIndex = 0; // Para rotar las preguntas
     
@@ -250,14 +255,17 @@ export default class GameScene extends Phaser.Scene {
         const x = this.mazeOffsetX + col * this.cellSize;
         const y = this.mazeOffsetY + row * this.cellSize;
 
-        // Dibujar el suelo de la celda
+        // Dibujar el suelo de la celda con borde invisible
+        const floorColor = cell.isQuestionZone ? 0x3498db : 0x34495e;
         const floor = this.add.rectangle(
           x + this.cellSize / 2,
           y + this.cellSize / 2,
-          this.cellSize - 2,
-          this.cellSize - 2,
-          cell.isQuestionZone ? 0x3498db : 0x34495e
+          this.cellSize,
+          this.cellSize,
+          floorColor
         );
+        // Borde del mismo color que el relleno para que sea invisible
+        floor.setStrokeStyle(2, floorColor);
 
         // Si es zona de pregunta, añadir un símbolo
         if (cell.isQuestionZone) {
@@ -300,51 +308,96 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Dibujar las paredes
-        const wallThickness = 4;
+        const wallThickness = 4; // Hitbox delgada para margen de error
+        const wallVisualThickness = 6; // Visual más grueso para mejor visibilidad
         
         if (cell.walls.top) {
+          // Crear visual de pared (más gruesa)
+          const wallVisual = this.add.rectangle(
+            x + this.cellSize / 2,
+            y,
+            this.cellSize,
+            wallVisualThickness,
+            0xe74c3c
+          );
+          
+          // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize / 2,
             y,
             this.cellSize,
             wallThickness,
-            0xe74c3c
+            0xe74c3c,
+            0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
           this.walls.add(wall);
         }
         
         if (cell.walls.right) {
+          // Crear visual de pared (más gruesa)
+          const wallVisual = this.add.rectangle(
+            x + this.cellSize,
+            y + this.cellSize / 2,
+            wallVisualThickness,
+            this.cellSize,
+            0xe74c3c
+          );
+          
+          // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize,
             y + this.cellSize / 2,
             wallThickness,
             this.cellSize,
-            0xe74c3c
+            0xe74c3c,
+            0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
           this.walls.add(wall);
         }
         
         if (cell.walls.bottom) {
+          // Crear visual de pared (más gruesa)
+          const wallVisual = this.add.rectangle(
+            x + this.cellSize / 2,
+            y + this.cellSize,
+            this.cellSize,
+            wallVisualThickness,
+            0xe74c3c
+          );
+          
+          // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize / 2,
             y + this.cellSize,
             this.cellSize,
             wallThickness,
-            0xe74c3c
+            0xe74c3c,
+            0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
           this.walls.add(wall);
         }
         
         if (cell.walls.left) {
+          // Crear visual de pared (más gruesa)
+          const wallVisual = this.add.rectangle(
+            x,
+            y + this.cellSize / 2,
+            wallVisualThickness,
+            this.cellSize,
+            0xe74c3c
+          );
+          
+          // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x,
             y + this.cellSize / 2,
             wallThickness,
             this.cellSize,
-            0xe74c3c
+            0xe74c3c,
+            0 // Invisible, solo para colisión
           );
           this.physics.add.existing(wall, true);
           this.walls.add(wall);
@@ -506,8 +559,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateUI() {
-    const heartIcons = '❤️'.repeat(this.lives) + '🖤'.repeat(3 - this.lives);
-    this.livesText.setText(`VIDAS\n${heartIcons}\n${this.lives}/3`);
+    const maxLives = this.localConfig.LIVES;
+    const heartIcons = '❤️'.repeat(this.lives) + '🖤'.repeat(Math.max(0, maxLives - this.lives));
+    this.livesText.setText(`VIDAS\n${heartIcons}\n${this.lives}/${maxLives}`);
     
     const timeRemaining = Math.floor(this.totalTimeLimit - this.timeElapsed);
     const minutes = Math.floor(timeRemaining / 60);
@@ -614,22 +668,27 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
+      // Usar valores de configuración local (tienen prioridad sobre backend)
+      const completionBonus = this.localConfig.COMPLETION_BONUS;
+      const pointsPerSecond = this.localConfig.POINTS_PER_SECOND_LEFT;
+      const pointsPerLife = this.localConfig.POINTS_PER_LIFE_LEFT;
+      
       // Bonificación por completar el laberinto
-      this.score += GAME_CONFIG.COMPLETION_BONUS;
+      this.score += completionBonus;
       
       // Bonificación por tiempo restante
-      const timeLeft = this.totalTimeLimit - this.timeElapsed;
-      const timeBonus = timeLeft * GAME_CONFIG.POINTS_PER_SECOND_LEFT;
+      const timeLeft = Math.max(0, this.totalTimeLimit - this.timeElapsed);
+      const timeBonus = Math.floor(timeLeft * pointsPerSecond);
       this.score += timeBonus;
       
       // Bonificación por vidas restantes
-      const lifeBonus = this.lives * GAME_CONFIG.POINTS_PER_LIFE_LEFT;
+      const lifeBonus = this.lives * pointsPerLife;
       this.score += lifeBonus;
       
       // Mensaje con detalles de bonificaciones
       const bonusDetails = `\n\n🎯 Bonificaciones:\n` +
-        `Completar: +${GAME_CONFIG.COMPLETION_BONUS} pts\n` +
-        `Tiempo restante (${timeLeft}s): +${timeBonus} pts\n` +
+        `Completar: +${completionBonus} pts\n` +
+        `Tiempo restante (${Math.floor(timeLeft)}s): +${timeBonus} pts\n` +
         `Vidas restantes (${this.lives}): +${lifeBonus} pts`;
       
       this.endGame(true, '¡Felicidades! ¡Completaste el laberinto!' + bonusDetails);
@@ -662,6 +721,7 @@ export default class GameScene extends Phaser.Scene {
       reason: reason,
       question: questionData, 
       config: this.gameConfig, 
+      localConfig: this.localConfig, // PASAR CONFIG LOCAL CON VALORES DE DIFICULTAD
       sessionAnswers: this.sessionAnswers, // PASAMOS REFERENCIA AL ARRAY
       onAnswer: this.onQuestionAnswered.bind(this),
       bluetoothController: this.bluetoothController
@@ -672,11 +732,9 @@ export default class GameScene extends Phaser.Scene {
     this.questionActive = false;
     this.scene.resume();
 
-    // Si es correcta, sumar puntos de respuesta
+    // Si es correcta, solo mostrar feedback (sin puntos)
     if (correct) {
-      const points = (this.gameConfig && this.gameConfig.POINTS_CORRECT_ANSWER) || 50;
-      this.score += points;
-      this.showFeedback(`¡Correcto! +${points} pts`, 0x2ecc71);
+      this.showFeedback('¡Correcto!', 0x2ecc71);
     } else {
       this.lives--;
       this.showFeedback('¡Incorrecto! -1 vida', 0xe74c3c);
@@ -686,11 +744,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Activar invulnerabilidad (duración desde configuración)
+    // Activar invulnerabilidad (duración desde configuración local)
     this.invulnerable = true;
     
     // Calcular número de parpadeos según la duración
-    const invulnerabilityDuration = (this.gameConfig && this.gameConfig.INVULNERABILITY_DURATION) || 1000;
+    const invulnerabilityDuration = this.localConfig.INVULNERABILITY_DURATION;
     const blinkDuration = 200; // Duración de cada parpadeo
     const repeatCount = Math.floor(invulnerabilityDuration / (blinkDuration * 2)) - 1;
     
@@ -739,10 +797,13 @@ export default class GameScene extends Phaser.Scene {
   // ============== FUNCIÓN PARA ENVIAR SESIÓN ==============
 
   async submitGameSession(won) {
+    // Asegurar que score sea un número válido
+    const finalScore = isNaN(this.score) || this.score === null || this.score === undefined ? 0 : Math.floor(this.score);
+    
     // Recolectar datos de la sesión
     const sessionData = {
       playerName: this.playerName, // Usar un valor por defecto o pedirlo al inicio
-      score: this.score,
+      score: finalScore,
       timeTaken: Math.floor(this.timeElapsed),
       result: won ? 'win' : 'loss',
       answers: this.sessionAnswers, // Si quieres guardar las respuestas, deberás recolectarlas durante el juego
@@ -767,14 +828,14 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  endGame(won, message) {
+  async endGame(won, message) {
     this.gameOver = true;
-    
-    // Enviar resultados al backend
-    this.submitGameSession(won); 
     
     // Detener el jugador
     this.player.body.setVelocity(0);
+    
+    // Enviar resultados al backend y esperar
+    await this.submitGameSession(won);
 
     // Mostrar mensaje final
     const controlText = this.bluetoothController && this.bluetoothController.isConnected() 
@@ -1054,8 +1115,8 @@ export default class GameScene extends Phaser.Scene {
       // Calcular progreso (0 = inicio, 1 = meta)
       const progress = 1 - (currentDistance / maxDistance);
       
-      // Calcular puntos basados en progreso (máximo 800)
-      const maxProgressPoints = (this.gameConfig && this.gameConfig.MAX_PROGRESS_POINTS) || 800; 
+      // Calcular puntos basados en progreso (usar configuración local)
+      const maxProgressPoints = this.localConfig.MAX_PROGRESS_POINTS;
       const newScore = Math.floor(progress * maxProgressPoints);
       
       // Solo actualizar si aumentó
@@ -1094,8 +1155,8 @@ export default class GameScene extends Phaser.Scene {
     // Actualizar puntos basados en progreso
     this.updateProgressScore();
 
-    // Movimiento del jugador usando InputManager
-    const speed = 150;
+    // Movimiento del jugador usando InputManager (velocidad desde config local)
+    const speed = this.localConfig.PLAYER_SPEED;
     
     // Obtener velocidades desde el InputManager (funciona con teclado y Bluetooth)
     const velocityX = this.inputManager.getVelocityX(speed);
@@ -1105,6 +1166,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   resize(gameSize) {
+    // Verificar que la escena está activa y la cámara existe
+    if (!this.cameras || !this.cameras.main || this.gameOver) {
+      return;
+    }
+    
     const width = gameSize.width;
     const height = gameSize.height;
 

@@ -73,8 +73,6 @@ QMaze/
 - Tamaño de celdas adaptativo según el tamaño de pantalla
 
 ### Sistema de Puntuación
-- **+50 puntos** por respuesta correcta
-- **+500 puntos** por completar el laberinto
 - **-1 vida** por respuesta incorrecta
 
 ### Sistema de Invulnerabilidad

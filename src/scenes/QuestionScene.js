@@ -92,17 +92,20 @@ export default class QuestionScene extends Phaser.Scene {
     
     // Almacena la configuración y la pregunta que GameScene nos pasa
     this.gameConfig = data.config; 
+    this.localConfig = data.localConfig; // Configuración local con valores de dificultad
     this.currentQuestion = data.question; 
     this.gameSessionAnswers = data.sessionAnswers;
     
-    // Obtiene el límite de la pregunta específica
-    const perQuestionLimit = this.currentQuestion.responseTimeLimit;
+    // Obtener el tiempo base de la pregunta desde el backend
+    const backendTimeLimit = this.currentQuestion.responseTimeLimit;
     
-    // Obtiene el límite de la configuración general (para fallback)
-    const configLimit = (this.gameConfig && this.gameConfig.QUESTION_TIME_LIMIT);
-
-    // Establece el límite: Prioriza el de la pregunta > Config. General > Default (10)
-    this.timeLimit = perQuestionLimit || configLimit || 10;
+    // Obtener el modificador de tiempo según dificultad (+2, 0, -2)
+    const timeModifier = (this.localConfig && this.localConfig.QUESTION_TIME_MODIFIER) || 0;
+    
+    // Calcular tiempo final aplicando el modificador al tiempo del backend
+    // Si el backend no especifica tiempo, usar 10 segundos por defecto
+    const baseTime = backendTimeLimit || 10;
+    this.timeLimit = Math.max(3, baseTime + timeModifier); // Mínimo 3 segundos
     
     // Variables para el conteo regresivo manual
     this.timerCountdown = this.timeLimit; // Contador

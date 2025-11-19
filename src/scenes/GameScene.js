@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import MazeGenerator from '../utils/MazeGenerator';
-import { GAME_CONFIG } from './QuestionScene';
 import InputManager from '../utils/InputManager';
+
+// URL base del backend (puerto 3000)
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -14,6 +16,10 @@ export default class GameScene extends Phaser.Scene {
     this.lives = 3;
     this.score = 0;
     
+    // --- Historial de respuestas ---
+    this.playerName = data.playerName || 'Invitado'; // Obtiene el nombre
+    this.sessionAnswers = []; // Array para almacenar las respuestas
+
     // Configuración del tamaño del laberinto
     this.mazeRows = 20;
     this.mazeCols = 20;
@@ -34,6 +40,11 @@ export default class GameScene extends Phaser.Scene {
     
     // Sistema de puntos basado en progreso
     this.visitedCells = new Set(); // Celdas visitadas para no contar dos veces
+
+    // Backend Data
+    this.gameConfig = null; // Se cargará desde /api/config
+    this.questionsBank = []; // Se cargará desde /api/questions
+    this.questionIndex = 0; // Para rotar las preguntas
     
     // Controlador Bluetooth
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
@@ -41,9 +52,114 @@ export default class GameScene extends Phaser.Scene {
     // Gestor de entrada unificado
     this.inputManager = new InputManager(this);
     this.bestDistance = Infinity; // Mejor distancia a la meta
+
+    this.isGameReady = false;
   }
 
+  // ============== LÓGICA DE CARGA DE DATOS ==============
+
   create() {
+    // Muestra la pantalla de carga
+    this.createLoadingScreen();
+
+    // Inicia la carga de datos (asíncrona)
+    this.preloadData()
+      .then(() => {
+          // Una vez cargados los datos, se inicia la escena real
+          this.destroyLoadingScreen();
+          this.setupGame();
+      })
+      .catch(() => {
+          // El error se maneja en preloadData
+      });
+  }
+  
+  createLoadingScreen() {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    
+    this.loadingContainer = this.add.container(0, 0);
+    this.loadingContainer.setDepth(1000);
+    
+    const overlay = this.add.rectangle(0, 0, width * 2, height * 2, 0x1a1a2e, 1);
+    overlay.setOrigin(0, 0);
+    
+    this.loadingText = this.add.text(width / 2, height / 2, 'Cargando datos del servidor...', {
+      fontSize: '32px',
+      fontFamily: 'Arial Black',
+      color: '#3498db'
+    });
+    this.loadingText.setOrigin(0.5);
+    
+    this.loadingContainer.add([overlay, this.loadingText]);
+    this.loadingContainer.setScrollFactor(0);
+  }
+
+  destroyLoadingScreen() {
+    if (this.loadingContainer) {
+        this.loadingContainer.destroy();
+    }
+  }
+
+  showErrorAndExit(message) {
+    this.destroyLoadingScreen();
+    // Mostrar un mensaje de error grande en el centro de la pantalla
+    const errorText = this.add.text(this.scale.width / 2, this.scale.height / 2, message, {
+        fontSize: '32px',
+        fontFamily: 'Arial Black',
+        color: '#e74c3c',
+        align: 'center'
+    });
+    errorText.setOrigin(0.5);
+    errorText.setScrollFactor(0);
+    
+    this.time.delayedCall(1000, () => {
+        this.add.text(this.scale.width / 2, this.scale.height / 2 + 50, 'Presiona cualquier tecla para volver al menú', {
+            fontSize: '20px',
+            fontFamily: 'Arial',
+            color: '#95a5a6'
+        }).setOrigin(0.5).setScrollFactor(0);
+        
+        this.input.keyboard.once('keydown', () => {
+            this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
+        });
+    });
+  }
+
+  async preloadData() {
+    try {
+        // Carga la configuración
+        const configResponse = await fetch(`${API_BASE_URL}/config`);
+        if (!configResponse.ok) throw new Error('Error al cargar la configuración del juego');
+        this.gameConfig = await configResponse.json();
+        
+        // Carga el banco de preguntas
+        const questionsResponse = await fetch(`${API_BASE_URL}/questions`);
+        if (!questionsResponse.ok) throw new Error('Error al cargar el banco de preguntas');
+        
+        let rawQuestions = await questionsResponse.json();
+        
+        // Transforma la cadena JSON de opciones a un array de JS
+        this.questionsBank = rawQuestions.map(question => ({
+            ...question,
+            // Sobrescribe la propiedad 'options' con el array parseado
+            options: JSON.parse(question.options) 
+        }));
+        
+        // Usa la configuración de tiempo del servidor
+        this.questionTimeInterval = (this.gameConfig && this.gameConfig.QUESTION_TIME_INTERVAL) || 20;
+
+        console.log('✅ Datos del servidor cargados: Config y Preguntas');
+    } catch (error) {
+        console.error('❌ Error al conectar con el backend:', error);
+        this.showErrorAndExit('Error de red. Asegúrate de que el backend esté corriendo en puerto 3000.');
+        throw error;
+    }
+  }
+
+// ============== LÓGICA DE JUEGO  ==============
+
+  setupGame() {
     this.calculateDimensions();
     
     // Generar el laberinto
@@ -90,6 +206,8 @@ export default class GameScene extends Phaser.Scene {
     
     // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
+
+    this.isGameReady = true;
   }
 
   calculateDimensions() {
@@ -519,8 +637,21 @@ export default class GameScene extends Phaser.Scene {
   }
 
   launchQuestion(reason) {
+    if (!this.questionsBank || this.questionsBank.length === 0) {
+        this.showFeedback('No hay preguntas disponibles. Continúa.', 0x95a5a6);
+        return;
+    }
+    
     this.questionActive = true;
     this.timeSinceLastQuestion = 0;
+
+    // Seleccionar una pregunta de forma rotativa/aleatoria
+    if (this.questionIndex >= this.questionsBank.length) {
+        this.questionIndex = 0;
+        Phaser.Utils.Array.Shuffle(this.questionsBank); // Mezclar al reiniciar
+    }
+    const questionData = this.questionsBank[this.questionIndex];
+    this.questionIndex++;
 
     // Pausar el movimiento del jugador
     this.player.body.setVelocity(0);
@@ -529,6 +660,9 @@ export default class GameScene extends Phaser.Scene {
     this.scene.pause();
     this.scene.launch('QuestionScene', {
       reason: reason,
+      question: questionData, 
+      config: this.gameConfig, 
+      sessionAnswers: this.sessionAnswers, // PASAMOS REFERENCIA AL ARRAY
       onAnswer: this.onQuestionAnswered.bind(this),
       bluetoothController: this.bluetoothController
     });
@@ -538,8 +672,11 @@ export default class GameScene extends Phaser.Scene {
     this.questionActive = false;
     this.scene.resume();
 
+    // Si es correcta, sumar puntos de respuesta
     if (correct) {
-      this.showFeedback('¡Correcto! Conservas tus vidas', 0x2ecc71);
+      const points = (this.gameConfig && this.gameConfig.POINTS_CORRECT_ANSWER) || 50;
+      this.score += points;
+      this.showFeedback(`¡Correcto! +${points} pts`, 0x2ecc71);
     } else {
       this.lives--;
       this.showFeedback('¡Incorrecto! -1 vida', 0xe74c3c);
@@ -553,7 +690,7 @@ export default class GameScene extends Phaser.Scene {
     this.invulnerable = true;
     
     // Calcular número de parpadeos según la duración
-    const invulnerabilityDuration = GAME_CONFIG.INVULNERABILITY_DURATION;
+    const invulnerabilityDuration = (this.gameConfig && this.gameConfig.INVULNERABILITY_DURATION) || 1000;
     const blinkDuration = 200; // Duración de cada parpadeo
     const repeatCount = Math.floor(invulnerabilityDuration / (blinkDuration * 2)) - 1;
     
@@ -599,8 +736,42 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // ============== FUNCIÓN PARA ENVIAR SESIÓN ==============
+
+  async submitGameSession(won) {
+    // Recolectar datos de la sesión
+    const sessionData = {
+      playerName: this.playerName, // Usar un valor por defecto o pedirlo al inicio
+      score: this.score,
+      timeTaken: Math.floor(this.timeElapsed),
+      result: won ? 'win' : 'loss',
+      answers: this.sessionAnswers, // Si quieres guardar las respuestas, deberás recolectarlas durante el juego
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/game/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(sessionData),
+      });
+
+      if (response.ok) {
+        console.log('✅ Historial de juego guardado exitosamente.');
+      } else {
+        console.error('❌ Error al guardar historial:', await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Error de red al enviar historial:', error);
+    }
+  }
+
   endGame(won, message) {
     this.gameOver = true;
+    
+    // Enviar resultados al backend
+    this.submitGameSession(won); 
     
     // Detener el jugador
     this.player.body.setVelocity(0);
@@ -884,7 +1055,8 @@ export default class GameScene extends Phaser.Scene {
       const progress = 1 - (currentDistance / maxDistance);
       
       // Calcular puntos basados en progreso (máximo 800)
-      const newScore = Math.floor(progress * GAME_CONFIG.MAX_PROGRESS_POINTS);
+      const maxProgressPoints = (this.gameConfig && this.gameConfig.MAX_PROGRESS_POINTS) || 800; 
+      const newScore = Math.floor(progress * maxProgressPoints);
       
       // Solo actualizar si aumentó
       if (newScore > this.score) {
@@ -896,6 +1068,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // SI EL JUEGO NO ESTÁ LISTO, DETENERSE AQUÍ
+    if (!this.isGameReady) return;
+
     // Actualizar estado de entrada desde teclado
     this.inputManager.updateFromKeyboard(this.cursors, this.spaceKey, this.pauseKey, this.pauseKeyP);
     

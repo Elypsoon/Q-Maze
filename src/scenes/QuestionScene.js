@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 
+/*
 // Configuración del juego (TODO: mover al backend en el futuro)
 export const GAME_CONFIG = {
   QUESTION_TIME_LIMIT: 10, // Segundos para responder cada pregunta
@@ -76,6 +77,8 @@ const QUESTION_BANK = [
   }
 ];
 
+*/
+
 export default class QuestionScene extends Phaser.Scene {
   constructor() {
     super({ key: 'QuestionScene' });
@@ -87,12 +90,23 @@ export default class QuestionScene extends Phaser.Scene {
     this.selectedOption = 0; // Iniciar en la primera opción
     this.answered = false;
     
-    // Configuración de tiempo desde el config (futuro: desde el servidor)
-    this.timeLimit = GAME_CONFIG.QUESTION_TIME_LIMIT;
-    this.timeLeft = this.timeLimit;
+    // Almacena la configuración y la pregunta que GameScene nos pasa
+    this.gameConfig = data.config; 
+    this.currentQuestion = data.question; 
+    this.gameSessionAnswers = data.sessionAnswers;
+    
+    // Obtiene el límite de la pregunta específica
+    const perQuestionLimit = this.currentQuestion.responseTimeLimit;
+    
+    // Obtiene el límite de la configuración general (para fallback)
+    const configLimit = (this.gameConfig && this.gameConfig.QUESTION_TIME_LIMIT);
 
-    // Seleccionar pregunta aleatoria
-    this.currentQuestion = QUESTION_BANK[Math.floor(Math.random() * QUESTION_BANK.length)];
+    // Establece el límite: Prioriza el de la pregunta > Config. General > Default (10)
+    this.timeLimit = perQuestionLimit || configLimit || 10;
+    
+    // Variables para el conteo regresivo manual
+    this.timerCountdown = this.timeLimit; // Contador
+    this.lastTimeTick = 0; // Acumulador de delta time
     
     // Controlador Bluetooth
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
@@ -104,6 +118,9 @@ export default class QuestionScene extends Phaser.Scene {
   }
 
   create() {
+    // Asegura que la escena esté en estado RUNNING ---
+    this.scene.resume();
+
     this.createQuestionUI();
     
     // Configurar controles de teclado/mando
@@ -180,6 +197,14 @@ export default class QuestionScene extends Phaser.Scene {
     });
   }
 
+  // startTimer() para el conteo manual. Lo dejamos vacío.
+  startTimer() {
+      if (this.timerEvent) {
+          this.timerEvent.remove();
+          this.timerEvent = null;
+      }
+  }
+
   createQuestionUI() {
     // Limpiar UI anterior si existe
     if (this.questionContainer) {
@@ -220,13 +245,15 @@ export default class QuestionScene extends Phaser.Scene {
 
     // Pregunta
     const questionSize = Math.min(26, width / 35);
-    const questionText = this.add.text(width / 2, height * 0.3, this.currentQuestion.question, {
-      fontSize: questionSize + 'px',
-      fontFamily: 'Arial',
-      color: '#ecf0f1',
-      align: 'center',
-      wordWrap: { width: panelWidth - 50 }
-    });
+    const questionText = this.add.text(width / 2, height * 0.3, 
+      this.currentQuestion.text, {
+        fontSize: questionSize + 'px',
+        fontFamily: 'Arial',
+        color: '#ecf0f1',
+        align: 'center',
+        wordWrap: { width: panelWidth - 50 }
+      }
+    );
     questionText.setOrigin(0.5);
 
     // Opciones
@@ -255,7 +282,7 @@ export default class QuestionScene extends Phaser.Scene {
 
     // Temporizador de respuesta (tiempo desde configuración)
     const timerSize = Math.min(24, width / 40);
-    this.timerText = this.add.text(width / 2, height * 0.85, `Tiempo: ${this.timeLeft}s`, {
+    this.timerText = this.add.text(width / 2, height * 0.85, `Tiempo: ${this.timerCountdown}s`, {
       fontSize: timerSize + 'px',
       fontFamily: 'Arial Black',
       color: '#f39c12'
@@ -274,6 +301,7 @@ export default class QuestionScene extends Phaser.Scene {
     }
   }
 
+  /*
   startTimer() {
     if (this.timerEvent) {
       this.timerEvent.remove();
@@ -282,6 +310,8 @@ export default class QuestionScene extends Phaser.Scene {
     this.timerEvent = this.time.addEvent({
       delay: 1000,
       callback: () => {
+        // --- LÍNEA DE DIAGNÓSTICO ---
+        console.log("TICK! Tiempo restante:", this.timeLeft);
         this.timeLeft--;
         this.timerText.setText(`Tiempo: ${this.timeLeft}s`);
         
@@ -293,6 +323,7 @@ export default class QuestionScene extends Phaser.Scene {
     });
   }
 
+  */
   createOptionButton(x, y, text, index, width, height) {
     const container = this.add.container(x, y);
 
@@ -352,11 +383,30 @@ export default class QuestionScene extends Phaser.Scene {
     this.answered = true;
     this.selectedOption = index;
     
+    /*
     if (this.timerEvent) {
       this.timerEvent.remove();
     }
+    */
 
-    const correct = index === this.currentQuestion.correctAnswer;
+    const correct = index === this.currentQuestion.correctAnswerIndex;
+
+    // --- REGISTRO DE RESPUESTA ---
+    const answerLog = {
+      questionId: this.currentQuestion.id,
+      questionText: this.currentQuestion.text,
+      selectedAnswerIndex: index,
+      selectedAnswerText: index >= 0 ? this.currentQuestion.options[index] : 'Tiempo Agotado',
+      correctAnswerIndex: this.currentQuestion.correctAnswerIndex,
+      isCorrect: correct,
+      timeLimit: this.timeLimit,
+      timeTaken: this.timeLimit - this.timerCountdown // Tiempo que tarda en responder
+    };
+    
+    // Añadir al array que GameScene nos pasa
+    if (this.gameSessionAnswers && Array.isArray(this.gameSessionAnswers)) {
+        this.gameSessionAnswers.push(answerLog);
+    }
 
     // Activar feedback en el ESP32 (LED y sonido)
     console.log('🎮 Verificando Bluetooth para feedback...');
@@ -394,7 +444,9 @@ export default class QuestionScene extends Phaser.Scene {
       const bg = btnObj.bg;
       const i = btnObj.index;
       
-      if (i === this.currentQuestion.correctAnswer) {
+      const correctAnswerIndex = this.currentQuestion.correctAnswerIndex;
+
+      if (i === correctAnswerIndex) {
         // Opción correcta en verde
         bg.setFillStyle(0x27ae60);
         bg.setStrokeStyle(3, 0x2ecc71);
@@ -440,8 +492,26 @@ export default class QuestionScene extends Phaser.Scene {
     });
   }
 
-  update() {
+  // --- MÉTODO UPDATE PARA CONTEO MANUAL ---
+  update(time, delta) { 
     if (this.answered) return;
+
+    // LÓGICA DE CONTEO REGRESIVO MANUAL
+    this.lastTimeTick += delta;
+
+    if (this.lastTimeTick >= 1000) { // Si ha pasado 1 segundo (1000 ms)
+        this.timerCountdown--;
+        this.lastTimeTick -= 1000; 
+        
+        // Actualizar UI
+        this.timerText.setText(`Tiempo: ${this.timerCountdown}s`);
+        
+        // Verificar tiempo agotado
+        if (this.timerCountdown <= 0) {
+            this.selectAnswer(-1); // Respuesta incorrecta por tiempo (index = -1)
+            return;
+        }
+    }
 
     // Navegación con teclas de dirección o mando
     if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {

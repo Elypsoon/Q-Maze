@@ -66,12 +66,21 @@ export default class MenuScene extends Phaser.Scene {
     const buttonWidth = Math.min(250, width / 4);
     const buttonHeight = Math.min(60, height / 12);
     const playButton = this.createButton(width / 2, height * 0.45, 'JUGAR', buttonWidth, buttonHeight, () => {
+      
+      // Implementación del PROMPT 
+      let playerName = prompt("Ingresa tu nombre para el registro de puntuaciones:");
+      
+      // Si el usuario no ingresa nada o solo espacios, usamos 'Invitado'
+      if (!playerName || playerName.trim() === '') {
+        playerName = 'Invitado';
+      }
+
       this.scene.start('GameScene', { 
         seed: Date.now(),
-        bluetoothController: window.bluetoothController 
+        bluetoothController: window.bluetoothController,
+        playerName: playerName // PASA EL NOMBRE AL INICIAR GameScene
       });
     });
-
     // Botón de Bluetooth
     const bluetoothButton = this.createButton(
       width / 2, 

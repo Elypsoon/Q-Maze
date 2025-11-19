@@ -12,70 +12,54 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init(data) {
-    // Obtener configuración del nivel de dificultad seleccionado
     const difficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
     this.localConfig = getConfigForDifficulty(difficulty);
     
-    // Parámetros del juego
     this.seed = data.seed || Date.now();
     this.lives = this.localConfig.LIVES;
     this.score = 0;
     
-    // --- Historial de respuestas ---
-    this.playerName = data.playerName || 'Invitado'; // Obtiene el nombre
-    this.sessionAnswers = []; // Array para almacenar las respuestas
+    this.playerName = data.playerName || 'Invitado';
+    this.sessionAnswers = [];
 
-    // Configuración del tamaño del laberinto (desde config local)
     this.mazeRows = this.localConfig.MAZE_ROWS;
     this.mazeCols = this.localConfig.MAZE_COLS;
     this.cellSize = this.localConfig.CELL_SIZE;
     
-    // Temporizadores (desde config local)
     this.totalTimeLimit = this.localConfig.TOTAL_TIME_LIMIT;
     this.questionTimeInterval = this.localConfig.QUESTION_TIME_INTERVAL;
     this.timeElapsed = 0;
     this.timeSinceLastQuestion = 0;
     
-    // Estado del juego
     this.gameOver = false;
     this.wallTouched = false;
     this.questionActive = false;
-    this.invulnerable = false; // Estado de invulnerabilidad
-    this.isPaused = false; // Estado de pausa
+    this.invulnerable = false;
+    this.isPaused = false;
     
-    // Sistema de puntos basado en progreso
-    this.visitedCells = new Set(); // Celdas visitadas para no contar dos veces
+    this.visitedCells = new Set();
 
-    // Backend Data
-    this.gameConfig = null; // Se cargará desde /api/config (para complementar)
-    this.questionsBank = []; // Se cargará desde /api/questions
-    this.questionIndex = 0; // Para rotar las preguntas
+    this.gameConfig = null;
+    this.questionsBank = [];
+    this.questionIndex = 0;
     
-    // Controlador Bluetooth
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
     
-    // Gestor de entrada unificado
     this.inputManager = new InputManager(this);
-    this.bestDistance = Infinity; // Mejor distancia a la meta
+    this.bestDistance = Infinity;
 
     this.isGameReady = false;
   }
 
-  // ============== LÓGICA DE CARGA DE DATOS ==============
-
   create() {
-    // Muestra la pantalla de carga
     this.createLoadingScreen();
 
-    // Inicia la carga de datos (asíncrona)
     this.preloadData()
       .then(() => {
-          // Una vez cargados los datos, se inicia la escena real
           this.destroyLoadingScreen();
           this.setupGame();
       })
       .catch(() => {
-          // El error se maneja en preloadData
       });
   }
   
@@ -129,29 +113,26 @@ export default class GameScene extends Phaser.Scene {
             this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
         });
     });
+
+    return button;
   }
 
   async preloadData() {
     try {
-        // Carga la configuración
         const configResponse = await fetch(`${API_BASE_URL}/config`);
         if (!configResponse.ok) throw new Error('Error al cargar la configuración del juego');
         this.gameConfig = await configResponse.json();
         
-        // Carga el banco de preguntas
         const questionsResponse = await fetch(`${API_BASE_URL}/questions`);
         if (!questionsResponse.ok) throw new Error('Error al cargar el banco de preguntas');
         
         let rawQuestions = await questionsResponse.json();
         
-        // Transforma la cadena JSON de opciones a un array de JS
         this.questionsBank = rawQuestions.map(question => ({
             ...question,
-            // Sobrescribe la propiedad 'options' con el array parseado
             options: JSON.parse(question.options) 
         }));
         
-        // Usa la configuración de tiempo del servidor
         this.questionTimeInterval = (this.gameConfig && this.gameConfig.QUESTION_TIME_INTERVAL) || 20;
 
         console.log('✅ Datos del servidor cargados: Config y Preguntas');
@@ -167,22 +148,17 @@ export default class GameScene extends Phaser.Scene {
   setupGame() {
     this.calculateDimensions();
     
-    // Generar el laberinto
     this.generateMaze();
 
-    // Crear el jugador
     this.createPlayer();
 
-    // Crear UI
     this.createUI();
 
-    // Configurar controles de teclado
     this.cursors = this.input.keyboard.createCursorKeys();
     this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.pauseKeyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Configurar callbacks del controlador Bluetooth
     if (this.bluetoothController) {
       this.bluetoothController.on('data', (events) => {
         if (!this.gameOver && !this.questionActive) {
@@ -195,7 +171,6 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // Configurar cámara para que siga al jugador pero dentro de los límites del laberinto
     const mazeWidth = this.mazeCols * this.cellSize;
     const mazeHeight = this.mazeRows * this.cellSize;
     this.cameras.main.setBounds(
@@ -206,10 +181,8 @@ export default class GameScene extends Phaser.Scene {
     );
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
-    // Iniciar temporizadores
     this.startTimers();
     
-    // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
 
     this.isGameReady = true;
@@ -219,36 +192,30 @@ export default class GameScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
 
-    // Calcular el tamaño del laberinto basado en el área disponible
-    // Reducimos el espacio reservado para el panel UI para que el laberinto sea más grande
-    const uiPanelWidth = Math.min(240, width * 0.18);
-    const availableWidth = width - uiPanelWidth - 30;
-    const availableHeight = height - 30;
+    const bottomUIHeight = 100;
+    const availableWidth = width - 40;
+    const availableHeight = height - bottomUIHeight - 40;
     
-    // Calcular el tamaño óptimo de celda
     const maxCellWidth = Math.floor(availableWidth / this.mazeCols);
     const maxCellHeight = Math.floor(availableHeight / this.mazeRows);
     this.cellSize = Math.min(maxCellWidth, maxCellHeight, 45);
     
-    // Calcular el offset para centrar el laberinto
-    this.mazeOffsetX = 15;
-    this.mazeOffsetY = Math.max(15, (height - (this.mazeRows * this.cellSize)) / 2);
+    const mazeWidth = this.mazeCols * this.cellSize;
+    const mazeHeight = this.mazeRows * this.cellSize;
+    this.mazeOffsetX = (width - mazeWidth) / 2;
+    this.mazeOffsetY = (availableHeight - mazeHeight) / 2 + 20;
   }
 
   generateMaze() {
     const generator = new MazeGenerator(this.mazeRows, this.mazeCols, this.seed);
     this.maze = generator.generate();
 
-    // Grupo para las paredes
     this.walls = this.physics.add.staticGroup();
     
-    // Grupo para las zonas de preguntas (usando Group en lugar de StaticGroup)
     this.questionZones = this.physics.add.group();
     
-    // Array para trackear las zonas visitadas
     this.visitedZones = new Set();
 
-    // Dibujar el laberinto
     for (let row = 0; row < this.mazeRows; row++) {
       for (let col = 0; col < this.mazeCols; col++) {
         const cell = this.maze[row][col];
@@ -478,82 +445,93 @@ export default class GameScene extends Phaser.Scene {
     this.uiContainer.setScrollFactor(0);
     this.uiContainer.setDepth(100);
     
-    // Crear panel de estadísticas en el lado derecho (responsive)
-    const panelWidth = Math.min(220, width * 0.2);
-    const panelHeight = Math.min(400, height * 0.7);
-    const panelX = width - panelWidth - 10;
-    const panelY = 20;
+    // Barra horizontal en la parte inferior
+    const barHeight = 70;
+    const barY = height - barHeight - 10;
+    const barWidth = Math.min(1000, width * 0.95);
+    const barX = width / 2;
     
-    // Fondo del panel
-    const panel = this.add.rectangle(
-      panelX + panelWidth / 2,
-      panelY + panelHeight / 2,
-      panelWidth,
-      panelHeight,
+    // Fondo de la barra
+    const bar = this.add.rectangle(
+      barX,
+      barY + barHeight / 2,
+      barWidth,
+      barHeight,
       0x2d3436,
       0.95
     );
-    panel.setStrokeStyle(3, 0x6c5ce7);
+    bar.setStrokeStyle(3, 0x6c5ce7);
 
-    // Tamaños de fuente adaptativos - Aumentados
-    const titleFontSize = Math.min(26, width * 0.024);
+    // Tamaños de fuente adaptativos
     const mainFontSize = Math.min(20, width * 0.019);
-    const smallFontSize = Math.min(18, width * 0.017);
-    const tinyFontSize = Math.min(16, width * 0.015);
+    const labelFontSize = Math.min(16, width * 0.015);
 
-    // Título del panel
-    const panelTitle = this.add.text(panelX + panelWidth / 2, panelY + 20, 'ESTADÍSTICAS', {
-      fontSize: titleFontSize + 'px',
-      fontFamily: 'Arial Black',
-      color: '#ecf0f1'
-    });
-    panelTitle.setOrigin(0.5, 0);
-
-    // Línea divisoria
-    const divider = this.add.rectangle(
-      panelX + panelWidth / 2,
-      panelY + 50,
-      panelWidth - 20,
-      2,
-      0xa29bfe
-    );
-
-    // Textos de estadísticas
+    // Configuración de textos
     const textConfig = {
       fontSize: mainFontSize + 'px',
-      fontFamily: 'Arial',
+      fontFamily: 'Arial Black',
       color: '#ecf0f1'
     };
-
-    this.livesText = this.add.text(panelX + 15, panelY + 70, '', textConfig);
-    this.timeText = this.add.text(panelX + 15, panelY + 130, '', textConfig);
-    this.questionTimerText = this.add.text(panelX + 15, panelY + 210, '', {
-      fontSize: smallFontSize + 'px',
-      fontFamily: 'Arial',
-      color: '#ecf0f1'
-    });
-    this.scoreText = this.add.text(panelX + 15, panelY + 290, '', textConfig);
     
-    // Indicador de invulnerabilidad
-    this.invulnerableText = this.add.text(panelX + 15, panelY + 340, '', {
-      fontSize: tinyFontSize + 'px',
+    const labelConfig = {
+      fontSize: labelFontSize + 'px',
+      fontFamily: 'Arial',
+      color: '#a29bfe'
+    };
+
+    // Dividir la barra en 4 secciones
+    const sectionWidth = barWidth / 4;
+    const section1X = barX - sectionWidth * 1.5;
+    const section2X = barX - sectionWidth * 0.5;
+    const section3X = barX + sectionWidth * 0.5;
+    const section4X = barX + sectionWidth * 1.5;
+    const textY = barY + barHeight / 2;
+
+    // Sección 1: VIDAS
+    const livesLabel = this.add.text(section1X, textY - 15, 'VIDAS', labelConfig);
+    livesLabel.setOrigin(0.5);
+    this.livesText = this.add.text(section1X, textY + 8, '', textConfig);
+    this.livesText.setOrigin(0.5);
+
+    // Sección 2: TIEMPO
+    const timeLabel = this.add.text(section2X, textY - 15, 'TIEMPO', labelConfig);
+    timeLabel.setOrigin(0.5);
+    this.timeText = this.add.text(section2X, textY + 8, '', textConfig);
+    this.timeText.setOrigin(0.5);
+
+    // Sección 3: PREGUNTA
+    const questionLabel = this.add.text(section3X, textY - 15, 'PREGUNTA', labelConfig);
+    questionLabel.setOrigin(0.5);
+    this.questionTimerText = this.add.text(section3X, textY + 8, '', textConfig);
+    this.questionTimerText.setOrigin(0.5);
+
+    // Sección 4: PUNTOS
+    const scoreLabel = this.add.text(section4X, textY - 15, 'PUNTOS', labelConfig);
+    scoreLabel.setOrigin(0.5);
+    this.scoreText = this.add.text(section4X, textY + 8, '', textConfig);
+    this.scoreText.setOrigin(0.5);
+    
+    this.invulnerableText = this.add.text(10, barY - 25, '', {
+      fontSize: '14px',
       fontFamily: 'Arial',
       color: '#f39c12'
     });
 
-    // Indicador de Bluetooth
-    this.bluetoothIndicator = this.add.text(panelX + 15, panelY + panelHeight - 35, '', {
-      fontSize: tinyFontSize + 'px',
+    this.bluetoothIndicator = this.add.text(width - 10, 10, '', {
+      fontSize: '14px',
       fontFamily: 'Arial',
       color: '#3498db'
     });
+    this.bluetoothIndicator.setOrigin(1, 0);
 
-    // Añadir todos los elementos al contenedor
     this.uiContainer.add([
-      panel, panelTitle, divider, 
-      this.livesText, this.timeText, 
-      this.questionTimerText, this.scoreText, 
-      this.invulnerableText, this.bluetoothIndicator
+      bar, 
+      livesLabel, this.livesText,
+      timeLabel, this.timeText,
+      questionLabel, this.questionTimerText,
+      scoreLabel, this.scoreText,
+      this.invulnerableText, 
+      this.bluetoothIndicator
     ]);
 
     this.updateUI();
@@ -562,17 +540,22 @@ export default class GameScene extends Phaser.Scene {
   updateUI() {
     const maxLives = this.localConfig.LIVES;
     const heartIcons = '❤️'.repeat(this.lives) + '🖤'.repeat(Math.max(0, maxLives - this.lives));
-    this.livesText.setText(`VIDAS\n${heartIcons}\n${this.lives}/${maxLives}`);
+    this.livesText.setText(`${heartIcons} ${this.lives}/${maxLives}`);
     
     const timeRemaining = Math.floor(this.totalTimeLimit - this.timeElapsed);
     const minutes = Math.floor(timeRemaining / 60);
     const seconds = timeRemaining % 60;
-    this.timeText.setText(`TIEMPO TOTAL\n⏱️ ${minutes}:${seconds.toString().padStart(2, '0')}`);
+    this.timeText.setText(`⏱️ ${minutes}:${seconds.toString().padStart(2, '0')}`);
     
+    this.scoreText.setText(`⭐ ${this.score}`);
+
+    // Actualizar timer de pregunta (siempre visible)
     const questionTime = Math.floor(this.questionTimeInterval - this.timeSinceLastQuestion);
-    this.questionTimerText.setText(`PRÓXIMA PREGUNTA\n❓ ${questionTime}s`);
-    
-    this.scoreText.setText(`PUNTUACIÓN\n⭐ ${this.score} pts`);
+    if (questionTime > 0) {
+      this.questionTimerText.setText(`⌚ ${questionTime}s`);
+    } else {
+      this.questionTimerText.setText('--');
+    }
 
     // Actualizar indicador de invulnerabilidad
     if (this.invulnerable) {
@@ -883,26 +866,20 @@ export default class GameScene extends Phaser.Scene {
     this.isPaused = !this.isPaused;
     
     if (this.isPaused) {
-      // Pausar física
       this.physics.pause();
       
-      // Pausar temporizadores
       if (this.gameTimer) {
         this.gameTimer.paused = true;
       }
       
-      // Mostrar menú de pausa
       this.showPauseMenu();
     } else {
-      // Reanudar física
       this.physics.resume();
       
-      // Reanudar temporizadores
       if (this.gameTimer) {
         this.gameTimer.paused = false;
       }
       
-      // Ocultar menú de pausa
       this.hidePauseMenu();
     }
   }
@@ -945,7 +922,7 @@ export default class GameScene extends Phaser.Scene {
     const spacing = buttonHeight + 20;
     
     // Botón Reanudar
-    this.createPauseButton(
+    const resumeButton = this.createPauseButton(
       width / 2,
       startY,
       '▶️ Reanudar',
@@ -956,7 +933,7 @@ export default class GameScene extends Phaser.Scene {
     );
     
     // Botón Reiniciar
-    this.createPauseButton(
+    const restartButton = this.createPauseButton(
       width / 2,
       startY + spacing,
       '🔄 Reiniciar',
@@ -967,14 +944,14 @@ export default class GameScene extends Phaser.Scene {
     );
     
     // Botón Salir
-    this.createPauseButton(
+    const exitButton = this.createPauseButton(
       width / 2,
       startY + spacing * 2,
       '🚪 Salir al Menú',
       buttonWidth,
       buttonHeight,
       () => this.exitToMenu(),
-      0xe74c3c
+      0x74416c
     );
     
     // Instrucción
@@ -987,13 +964,12 @@ export default class GameScene extends Phaser.Scene {
     });
     instruction.setOrigin(0.5);
     
-    // Agregar instrucción al contenedor
-    this.pauseContainer.add(instruction);
+    this.pauseContainer.add([overlay, panel, title, resumeButton, restartButton, exitButton, instruction]);
   }
 
-  createPauseButton(x, y, text, width, height, callback, color = 0xe94560) {
+  createPauseButton(x, y, text, width, height, callback, color = 0x6c5ce7) {
     const button = this.add.container(x, y);
-    button.setDepth(10001); // Mayor que el contenedor de pausa
+    button.setScrollFactor(0);
     
     // Fondo del botón
     const bg = this.add.rectangle(0, 0, width, height, color);
@@ -1044,8 +1020,6 @@ export default class GameScene extends Phaser.Scene {
       });
     });
     
-    // Agregar el botón al contenedor de pausa
-    this.pauseContainer.add(button);
     return button;
   }
 

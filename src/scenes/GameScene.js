@@ -661,8 +661,8 @@ export default class GameScene extends Phaser.Scene {
 
   onWallTouch(player, wall) {
     // Las paredes bloquean físicamente (collider)
-    // Solo lanzar pregunta si no está en invulnerabilidad y no hay pregunta activa
-    if (!this.wallTouched && !this.questionActive && !this.invulnerable) {
+    // Solo lanzar pregunta si no está en invulnerabilidad, no hay pregunta activa y el juego no ha terminado
+    if (!this.wallTouched && !this.questionActive && !this.invulnerable && !this.gameOver) {
       this.wallTouched = true;
       
       // Efecto visual de colisión: shake del jugador
@@ -697,7 +697,7 @@ export default class GameScene extends Phaser.Scene {
     const zoneId = zone.getData('zoneId');
     const visited = zone.getData('visited');
     
-    if (!this.questionActive && !visited && zone.getData('isQuestionZone')) {
+    if (!this.questionActive && !visited && zone.getData('isQuestionZone') && !this.gameOver) {
       // Marcar como visitada para no lanzar pregunta de nuevo
       zone.setData('visited', true);
       zone.setData('isQuestionZone', false);
@@ -725,6 +725,10 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
+      // Marcar juego terminado INMEDIATAMENTE para evitar colisiones adicionales
+      this.gameOver = true;
+      this.player.body.setVelocity(0);
+      
       // Animación de celebración: jugador crece y brilla
       this.tweens.add({
         targets: player,

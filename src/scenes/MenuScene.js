@@ -7,12 +7,10 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   init(data) {
-    // Inicializar el nivel de dificultad seleccionado (por defecto medio)
     this.selectedDifficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
     
-    // Nombre del jugador por defecto
-    this.playerName = 'Runner';
+    this.playerName = data.playerName || 'Runner';
   }
 
   create() {
@@ -136,7 +134,7 @@ export default class MenuScene extends Phaser.Scene {
     const selectedConfig = GAME_CONFIG[this.selectedDifficulty];
     this.difficultyDescription = this.add.text(
       width / 2, 
-      height * 0.59, 
+      height * 0.56, 
       selectedConfig.DIFFICULTY_DESCRIPTION, 
       {
         fontSize: diffDescSize + 'px',
@@ -148,57 +146,10 @@ export default class MenuScene extends Phaser.Scene {
     );
     this.difficultyDescription.setOrigin(0.5);
 
-    // Campo de nombre del jugador (en la misma línea)
-    const nameSize = Math.min(18, width / 50);
-    const nameLabel = this.add.text(width / 2 - 140, height * 0.68, 'Nombre:', {
-      fontSize: nameSize + 'px',
-      fontFamily: 'Arial',
-      color: '#ecf0f1'
-    });
-    nameLabel.setOrigin(0.5);
-
-    // Input HTML para el nombre (más pequeño y en la misma línea)
-    const inputWidth = Math.min(200, width * 0.25);
-    const inputHeight = Math.min(34, height / 24);
-    
-    // Crear un elemento HTML input
-    const inputElement = document.createElement('input');
-    inputElement.type = 'text';
-    inputElement.id = 'playerNameInput';
-    inputElement.value = this.playerName;
-    inputElement.placeholder = 'Runner';
-    inputElement.maxLength = 20;
-    inputElement.style.position = 'absolute';
-    inputElement.style.left = `${(width / 2) - 20}px`;
-    inputElement.style.top = `${height * 0.68 - (inputHeight / 2)}px`;
-    inputElement.style.width = `${inputWidth}px`;
-    inputElement.style.height = `${inputHeight}px`;
-    inputElement.style.fontSize = `${Math.min(16, width / 60)}px`;
-    inputElement.style.fontFamily = 'Arial';
-    inputElement.style.padding = '8px';
-    inputElement.style.border = '2px solid #3498db';
-    inputElement.style.borderRadius = '5px';
-    inputElement.style.backgroundColor = '#2c3e50';
-    inputElement.style.color = '#ecf0f1';
-    inputElement.style.textAlign = 'center';
-    inputElement.style.outline = 'none';
-    inputElement.style.zIndex = '1000';
-    
-    // Agregar evento para actualizar el nombre
-    inputElement.addEventListener('input', (e) => {
-      this.playerName = e.target.value.trim() || 'Runner';
-    });
-    
-    // Agregar al DOM
-    document.body.appendChild(inputElement);
-    
-    // Guardar referencia para limpieza
-    this.nameInput = inputElement;
-
     // Botón de Jugar
     const buttonWidth = Math.min(240, width / 4.5);
     const buttonHeight = Math.min(55, height / 13);
-    const playButton = this.createButton(width / 2, height * 0.78, 'JUGAR', buttonWidth, buttonHeight, () => {
+    const playButton = this.createButton(width / 2, height * 0.68, 'JUGAR', buttonWidth, buttonHeight, () => {
       // Usar el nombre ingresado en el input
       const playerName = this.playerName || 'Runner';
       
@@ -215,7 +166,7 @@ export default class MenuScene extends Phaser.Scene {
     // Botón de Bluetooth
     const bluetoothButton = this.createButton(
       width / 2, 
-      height * 0.86, 
+      height * 0.76, 
       'Mando BT', 
       buttonWidth, 
       buttonHeight, 
@@ -230,21 +181,50 @@ export default class MenuScene extends Phaser.Scene {
       0x3498db
     );
 
-    // Instrucciones
-    const instrSize = Math.min(14, width / 65);
-    const instructions = this.add.text(width / 2, height * 0.94, 
-      'Controles: ← ↑ → ↓ para moverte | ESC/P para pausar\n' +
-      'Gana puntos al avanzar y completar. ¡Responde bien para conservar vidas!', {
-      fontSize: instrSize + 'px',
+    // Campo de nombre del jugador (debajo del botón BT, en horizontal)
+    const nameSize = Math.min(18, width / 50);
+    const nameLabel = this.add.text(width / 2 - 120, height * 0.84, 'Nombre:', {
+      fontSize: nameSize + 'px',
       fontFamily: 'Arial',
-      color: '#7f8c8d',
-      align: 'center',
-      lineSpacing: 3
+      color: '#ecf0f1'
     });
-    instructions.setOrigin(0.5);
+    nameLabel.setOrigin(0.5);
+
+    // Input HTML para el nombre (en la misma línea horizontal)
+    const inputWidth = Math.min(200, width * 0.25);
+    const inputHeight = Math.min(34, height / 24);
+    
+    const inputElement = document.createElement('input');
+    inputElement.type = 'text';
+    inputElement.id = 'playerNameInput';
+    inputElement.value = this.playerName;
+    inputElement.placeholder = 'Runner';
+    inputElement.maxLength = 20;
+    inputElement.style.position = 'absolute';
+    inputElement.style.left = `${(width / 2) + 10}px`;
+    inputElement.style.top = `${height * 0.84 - (inputHeight / 2)}px`;
+    inputElement.style.width = `${inputWidth}px`;
+    inputElement.style.height = `${inputHeight}px`;
+    inputElement.style.fontSize = `${Math.min(16, width / 60)}px`;
+    inputElement.style.fontFamily = 'Arial';
+    inputElement.style.padding = '8px';
+    inputElement.style.border = '2px solid #3498db';
+    inputElement.style.borderRadius = '5px';
+    inputElement.style.backgroundColor = '#2c3e50';
+    inputElement.style.color = '#ecf0f1';
+    inputElement.style.textAlign = 'center';
+    inputElement.style.outline = 'none';
+    inputElement.style.zIndex = '1000';
+    
+    inputElement.addEventListener('input', (e) => {
+      this.playerName = e.target.value.trim() || 'Runner';
+    });
+    
+    document.body.appendChild(inputElement);
+    this.nameInput = inputElement;
 
     // Agregar elementos al contenedor (no el input HTML, ese está en el DOM)
-    this.menuContainer.add([title, subtitle, description, diffLabel, nameLabel, this.difficultyDescription, instructions]);
+    this.menuContainer.add([title, subtitle, description, diffLabel, nameLabel, this.difficultyDescription]);
 
     // Animación de parpadeo en el título
     this.titleTween = this.tweens.add({

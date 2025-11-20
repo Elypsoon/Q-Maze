@@ -13,6 +13,7 @@ export default class GameScene extends Phaser.Scene {
 
   init(data) {
     const difficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
+    this.difficulty = difficulty;
     this.localConfig = getConfigForDifficulty(difficulty);
     
     this.seed = data.seed || Date.now();
@@ -209,6 +210,12 @@ export default class GameScene extends Phaser.Scene {
     
     this.visitedZones = new Set();
 
+    // Helper para verificar paredes vecinas de forma segura
+    const checkWall = (r, c, side) => {
+      if (r < 0 || r >= this.mazeRows || c < 0 || c >= this.mazeCols) return false;
+      return this.maze[r][c].walls[side];
+    };
+
     for (let row = 0; row < this.mazeRows; row++) {
       for (let col = 0; col < this.mazeCols; col++) {
         const cell = this.maze[row][col];
@@ -268,25 +275,28 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Dibujar las paredes
-        const wallThickness = 4; // Hitbox delgada para margen de error
+        const wallThickness = 1; // Hitbox delgada para margen de error
         const wallVisualThickness = 6; // Visual más grueso para mejor visibilidad
-        const wallColor = 0x6c5ce7; // Color morado vibrante
+        const wallColor = 0x00FF00; // Color verde vibrante
+        const halfThick = wallVisualThickness / 2;
+        const quarterThick = wallVisualThickness / 4;
         
         if (cell.walls.top) {
-          // Crear visual de pared (más gruesa)
-          const wallVisual = this.add.rectangle(
-            x + this.cellSize / 2,
-            y,
-            this.cellSize,
-            wallVisualThickness,
-            wallColor
-          );
+          // Verificar si debemos extender la pared visualmente para cubrir esquinas
+          // Extendemos si hay una pared perpendicular O si la pared continúa en esa dirección
+          const extLeft = checkWall(row, col, 'left') || checkWall(row, col-1, 'top') || checkWall(row-1, col, 'left');
+          const extRight = checkWall(row, col, 'right') || checkWall(row, col+1, 'top') || checkWall(row-1, col, 'right');
+          
+          const w = this.cellSize + (extLeft ? halfThick : 0) + (extRight ? halfThick : 0);
+          const cx = x + this.cellSize / 2 + (extRight ? quarterThick : 0) - (extLeft ? quarterThick : 0);
+
+          const wallVisual = this.add.rectangle(cx, y, w, wallVisualThickness, wallColor);
           
           // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize / 2,
             y,
-            this.cellSize,
+            this.cellSize-4,
             wallThickness,
             wallColor,
             0 // Invisible, solo para colisión
@@ -296,21 +306,20 @@ export default class GameScene extends Phaser.Scene {
         }
         
         if (cell.walls.right) {
-          // Crear visual de pared (más gruesa)
-          const wallVisual = this.add.rectangle(
-            x + this.cellSize,
-            y + this.cellSize / 2,
-            wallVisualThickness,
-            this.cellSize,
-            wallColor
-          );
+          const extTop = checkWall(row, col, 'top') || checkWall(row, col+1, 'top') || checkWall(row-1, col, 'right');
+          const extBottom = checkWall(row, col, 'bottom') || checkWall(row, col+1, 'bottom') || checkWall(row+1, col, 'right');
+          
+          const h = this.cellSize + (extTop ? halfThick : 0) + (extBottom ? halfThick : 0);
+          const cy = y + this.cellSize / 2 + (extBottom ? quarterThick : 0) - (extTop ? quarterThick : 0);
+
+          const wallVisual = this.add.rectangle(x + this.cellSize, cy, wallVisualThickness, h, wallColor);
           
           // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize,
             y + this.cellSize / 2,
             wallThickness,
-            this.cellSize,
+            this.cellSize - 4,
             wallColor,
             0 // Invisible, solo para colisión
           );
@@ -319,20 +328,19 @@ export default class GameScene extends Phaser.Scene {
         }
         
         if (cell.walls.bottom) {
-          // Crear visual de pared (más gruesa)
-          const wallVisual = this.add.rectangle(
-            x + this.cellSize / 2,
-            y + this.cellSize,
-            this.cellSize,
-            wallVisualThickness,
-            wallColor
-          );
+          const extLeft = checkWall(row, col, 'left') || checkWall(row, col-1, 'bottom') || checkWall(row+1, col, 'left');
+          const extRight = checkWall(row, col, 'right') || checkWall(row, col+1, 'bottom') || checkWall(row+1, col, 'right');
+          
+          const w = this.cellSize + (extLeft ? halfThick : 0) + (extRight ? halfThick : 0);
+          const cx = x + this.cellSize / 2 + (extRight ? quarterThick : 0) - (extLeft ? quarterThick : 0);
+
+          const wallVisual = this.add.rectangle(cx, y + this.cellSize, w, wallVisualThickness, wallColor);
           
           // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x + this.cellSize / 2,
             y + this.cellSize,
-            this.cellSize,
+            this.cellSize-4,
             wallThickness,
             wallColor,
             0 // Invisible, solo para colisión
@@ -342,21 +350,20 @@ export default class GameScene extends Phaser.Scene {
         }
         
         if (cell.walls.left) {
-          // Crear visual de pared (más gruesa)
-          const wallVisual = this.add.rectangle(
-            x,
-            y + this.cellSize / 2,
-            wallVisualThickness,
-            this.cellSize,
-            wallColor
-          );
+          const extTop = checkWall(row, col, 'top') || checkWall(row, col-1, 'top') || checkWall(row-1, col, 'left');
+          const extBottom = checkWall(row, col, 'bottom') || checkWall(row, col-1, 'bottom') || checkWall(row+1, col, 'left');
+          
+          const h = this.cellSize + (extTop ? halfThick : 0) + (extBottom ? halfThick : 0);
+          const cy = y + this.cellSize / 2 + (extBottom ? quarterThick : 0) - (extTop ? quarterThick : 0);
+
+          const wallVisual = this.add.rectangle(x, cy, wallVisualThickness, h, wallColor);
           
           // Crear hitbox de pared (más delgada para dar margen)
           const wall = this.add.rectangle(
             x,
             y + this.cellSize / 2,
             wallThickness,
-            this.cellSize,
+            this.cellSize-4,
             wallColor,
             0 // Invisible, solo para colisión
           );
@@ -645,26 +652,26 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
-      // Usar valores de configuración local (tienen prioridad sobre backend)
       const completionBonus = this.localConfig.COMPLETION_BONUS;
       const pointsPerSecond = this.localConfig.POINTS_PER_SECOND_LEFT;
       const pointsPerLife = this.localConfig.POINTS_PER_LIFE_LEFT;
+      const multiplier = this.localConfig.SCORE_MULTIPLIER;
       
       // Bonificación por completar el laberinto
-      this.score += completionBonus;
+      this.score += Math.floor(completionBonus * multiplier);
       
       // Bonificación por tiempo restante
       const timeLeft = Math.max(0, this.totalTimeLimit - this.timeElapsed);
-      const timeBonus = Math.floor(timeLeft * pointsPerSecond);
+      const timeBonus = Math.floor(timeLeft * pointsPerSecond * multiplier);
       this.score += timeBonus;
       
       // Bonificación por vidas restantes
-      const lifeBonus = this.lives * pointsPerLife;
+      const lifeBonus = Math.floor(this.lives * pointsPerLife * multiplier);
       this.score += lifeBonus;
       
       // Mensaje con detalles de bonificaciones
       const bonusDetails = `\n\n🎯 Bonificaciones:\n` +
-        `Completar: +${completionBonus} pts\n` +
+        `Completar: +${Math.floor(completionBonus * multiplier)} pts\n` +
         `Tiempo restante (${Math.floor(timeLeft)}s): +${timeBonus} pts\n` +
         `Vidas restantes (${this.lives}): +${lifeBonus} pts`;
       
@@ -1031,14 +1038,20 @@ export default class GameScene extends Phaser.Scene {
     this.scene.stop('QuestionScene');
     this.scene.restart({ 
       seed: Date.now(),
-      bluetoothController: this.bluetoothController 
+      bluetoothController: this.bluetoothController,
+      difficulty: this.difficulty,
+      playerName: this.playerName
     });
   }
 
   exitToMenu() {
     this.hidePauseMenu();
     this.scene.stop('QuestionScene');
-    this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
+    this.scene.start('MenuScene', { 
+      bluetoothController: this.bluetoothController,
+      difficulty: this.difficulty,
+      playerName: this.playerName
+    });
   }
 
   calculateManhattanDistance(x1, y1, x2, y2) {
@@ -1083,9 +1096,9 @@ export default class GameScene extends Phaser.Scene {
       // Calcular progreso (0 = inicio, 1 = meta)
       const progress = 1 - (currentDistance / maxDistance);
       
-      // Calcular puntos basados en progreso (usar configuración local)
       const maxProgressPoints = this.localConfig.MAX_PROGRESS_POINTS;
-      const newScore = Math.floor(progress * maxProgressPoints);
+      const multiplier = this.localConfig.SCORE_MULTIPLIER;
+      const newScore = Math.floor(progress * maxProgressPoints * multiplier);
       
       // Solo actualizar si aumentó
       if (newScore > this.score) {

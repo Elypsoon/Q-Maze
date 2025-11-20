@@ -41,8 +41,8 @@ export default class InputManager {
     };
     
     // Configuración de aceleración
-    this.minSpeed = 100;
-    this.maxSpeed = 150;
+    this.minSpeed = 50;
+    this.maxSpeed = 100;
     this.accelerationTime = 100; // Tiempo en ms para llegar a velocidad máxima
     
     // Timeout para auto-reset de direcciones (si no hay actualización en este tiempo, resetear)

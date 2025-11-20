@@ -28,8 +28,13 @@ export default class BluetoothSetupScene extends Phaser.Scene {
     // Panel
     const panelWidth = Math.min(600, width * 0.85);
     const panelHeight = Math.min(500, height * 0.8);
-    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2c3e50);
-    panel.setStrokeStyle(4, 0x3498db);
+    
+    // Panel con bordes redondeados
+    const panel = this.add.graphics();
+    panel.fillStyle(0x2c3e50, 1);
+    panel.lineStyle(4, 0x3498db, 1);
+    panel.fillRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 20);
+    panel.strokeRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 20);
 
     // Título
     const titleSize = Math.min(36, width / 22);
@@ -93,6 +98,18 @@ export default class BluetoothSetupScene extends Phaser.Scene {
 
     // Agregar elementos al contenedor
     this.container.add([overlay, panel, title, this.statusText, info, this.connectButton, backButton]);
+    
+    // Animación de entrada
+    this.container.setAlpha(0);
+    this.container.setScale(0.9);
+    this.tweens.add({
+        targets: this.container,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 300,
+        ease: 'Power2'
+    });
 
     // Verificar si ya está conectado
     this.updateStatus();
@@ -173,9 +190,18 @@ export default class BluetoothSetupScene extends Phaser.Scene {
   createButton(x, y, text, width, height, callback, color = 0x3498db) {
     const button = this.add.container(x, y);
     
-    // Fondo del botón
-    const bg = this.add.rectangle(0, 0, width, height, color);
-    bg.setStrokeStyle(3, 0xffffff);
+    // Fondo del botón (Rounded)
+    const bg = this.add.graphics();
+    
+    const drawBg = (strokeColor, strokeWidth) => {
+        bg.clear();
+        bg.fillStyle(color, 1);
+        bg.lineStyle(strokeWidth, strokeColor, 1);
+        bg.fillRoundedRect(-width/2, -height/2, width, height, 10);
+        bg.strokeRoundedRect(-width/2, -height/2, width, height, 10);
+    };
+    
+    drawBg(0xffffff, 3);
     
     // Texto del botón
     const buttonTextSize = Math.min(20, width / 14);
@@ -193,7 +219,7 @@ export default class BluetoothSetupScene extends Phaser.Scene {
     
     // Efectos hover
     button.on('pointerover', () => {
-      bg.setStrokeStyle(4, 0xf39c12);
+      drawBg(0xf39c12, 4);
       this.tweens.add({
         targets: button,
         scaleX: 1.05,
@@ -203,7 +229,7 @@ export default class BluetoothSetupScene extends Phaser.Scene {
     });
     
     button.on('pointerout', () => {
-      bg.setStrokeStyle(3, 0xffffff);
+      drawBg(0xffffff, 3);
       this.tweens.add({
         targets: button,
         scaleX: 1,
@@ -227,7 +253,10 @@ export default class BluetoothSetupScene extends Phaser.Scene {
   }
 
   goBack() {
-    this.scene.start('MenuScene', { bluetoothController: this.bluetoothController });
+    this.scene.start('MenuScene', { 
+      bluetoothController: this.bluetoothController,
+      skipAnimations: true
+    });
   }
 
   resize(gameSize) {

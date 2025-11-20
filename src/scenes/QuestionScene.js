@@ -1,84 +1,4 @@
 import Phaser from 'phaser';
-
-/*
-// Configuración del juego (TODO: mover al backend en el futuro)
-export const GAME_CONFIG = {
-  QUESTION_TIME_LIMIT: 10, // Segundos para responder cada pregunta
-  INVULNERABILITY_DURATION: 1000, // Duración de invulnerabilidad en ms (1 segundo)
-  
-  // Sistema de puntos basado en progreso
-  MAX_PROGRESS_POINTS: 800, // Puntos máximos por avanzar en el laberinto
-  COMPLETION_BONUS: 200, // Bonificación por llegar a la meta
-  POINTS_PER_SECOND_LEFT: 2, // Puntos por cada segundo restante
-  POINTS_PER_LIFE_LEFT: 150 // Puntos por cada vida restante
-};
-
-// Banco de preguntas temporal (esto luego vendrá del backend)
-const QUESTION_BANK = [
-  {
-    id: 1,
-    question: '¿Cuál es la capital de Francia?',
-    options: ['Londres', 'París', 'Madrid', 'Roma'],
-    correctAnswer: 1
-  },
-  {
-    id: 2,
-    question: '¿Cuántos continentes hay en el mundo?',
-    options: ['5', '6', '7', '8'],
-    correctAnswer: 2
-  },
-  {
-    id: 3,
-    question: '¿Quién escribió "Don Quijote de la Mancha"?',
-    options: ['Shakespeare', 'Cervantes', 'García Márquez', 'Borges'],
-    correctAnswer: 1
-  },
-  {
-    id: 4,
-    question: '¿Cuál es el planeta más grande del sistema solar?',
-    options: ['Marte', 'Saturno', 'Júpiter', 'Neptuno'],
-    correctAnswer: 2
-  },
-  {
-    id: 5,
-    question: '¿En qué año comenzó la Segunda Guerra Mundial?',
-    options: ['1935', '1939', '1941', '1945'],
-    correctAnswer: 1
-  },
-  {
-    id: 6,
-    question: '¿Cuántos lados tiene un hexágono?',
-    options: ['4', '5', '6', '8'],
-    correctAnswer: 2
-  },
-  {
-    id: 7,
-    question: '¿Cuál es el océano más grande del mundo?',
-    options: ['Atlántico', 'Índico', 'Ártico', 'Pacífico'],
-    correctAnswer: 3
-  },
-  {
-    id: 8,
-    question: '¿Qué gas necesitan las plantas para realizar la fotosíntesis?',
-    options: ['Oxígeno', 'Nitrógeno', 'Dióxido de carbono', 'Hidrógeno'],
-    correctAnswer: 2
-  },
-  {
-    id: 9,
-    question: '¿Cuál es el río más largo del mundo?',
-    options: ['Nilo', 'Amazonas', 'Yangtsé', 'Misisipi'],
-    correctAnswer: 1
-  },
-  {
-    id: 10,
-    question: '¿Cuántos huesos tiene el cuerpo humano adulto?',
-    options: ['186', '206', '226', '246'],
-    correctAnswer: 1
-  }
-];
-
-*/
-
 export default class QuestionScene extends Phaser.Scene {
   constructor() {
     super({ key: 'QuestionScene' });
@@ -228,8 +148,13 @@ export default class QuestionScene extends Phaser.Scene {
     // Panel de pregunta - adaptativo
     const panelWidth = Math.min(700, width * 0.85);
     const panelHeight = Math.min(500, height * 0.75);
-    const panel = this.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2d3436);
-    panel.setStrokeStyle(4, 0x6c5ce7);
+    
+    // Panel con bordes redondeados
+    const panel = this.add.graphics();
+    panel.fillStyle(0x2d3436, 1);
+    panel.lineStyle(4, 0x6c5ce7, 1);
+    panel.fillRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 20);
+    panel.strokeRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 20);
 
     // Título según la razón
     const reasons = {
@@ -297,6 +222,18 @@ export default class QuestionScene extends Phaser.Scene {
     this.optionButtons.forEach(btn => {
       this.questionContainer.add(btn.container);
     });
+    
+    // Animación de entrada (Pop-in)
+    this.questionContainer.setScale(0.8);
+    this.questionContainer.setAlpha(0);
+    this.tweens.add({
+        targets: this.questionContainer,
+        scaleX: 1,
+        scaleY: 1,
+        alpha: 1,
+        duration: 300,
+        ease: 'Back.easeOut'
+    });
 
     // Iniciar temporizador solo si no se está recreando después de responder
     if (!this.answered) {
@@ -330,9 +267,18 @@ export default class QuestionScene extends Phaser.Scene {
   createOptionButton(x, y, text, index, width, height) {
     const container = this.add.container(x, y);
 
-    // Fondo del botón
-    const bg = this.add.rectangle(0, 0, width, height, 0x353b48);
-    bg.setStrokeStyle(2, 0x6c5ce7);
+    // Fondo del botón (Rounded)
+    const bg = this.add.graphics();
+    
+    const drawBg = (color, strokeColor, strokeWidth) => {
+        bg.clear();
+        bg.fillStyle(color, 1);
+        bg.lineStyle(strokeWidth, strokeColor, 1);
+        bg.fillRoundedRect(-width/2, -height/2, width, height, 10);
+        bg.strokeRoundedRect(-width/2, -height/2, width, height, 10);
+    };
+    
+    drawBg(0x353b48, 0x6c5ce7, 2);
 
     // Letra de la opción
     const letters = ['A', 'B', 'C', 'D'];
@@ -357,6 +303,10 @@ export default class QuestionScene extends Phaser.Scene {
     container.add([bg, letter, optionText]);
     container.setSize(width, height);
     container.setInteractive({ useHandCursor: true });
+    
+    // Guardar referencias
+    container.bg = bg;
+    container.drawBg = drawBg;
 
     // Efectos hover
     container.on('pointerover', () => {
@@ -377,7 +327,7 @@ export default class QuestionScene extends Phaser.Scene {
       }
     });
 
-    return { container, bg, index };
+    return { container, bg, drawBg, index };
   }
 
   async selectAnswer(index, clickedBg) {
@@ -444,21 +394,27 @@ export default class QuestionScene extends Phaser.Scene {
 
     // Colorear las opciones
     this.optionButtons.forEach((btnObj) => {
-      const bg = btnObj.bg;
       const i = btnObj.index;
-      
       const correctAnswerIndex = this.currentQuestion.correctAnswerIndex;
 
       if (i === correctAnswerIndex) {
         // Opción correcta en verde
-        bg.setFillStyle(0x27ae60);
-        bg.setStrokeStyle(3, 0x2ecc71);
+        btnObj.drawBg(0x27ae60, 0x2ecc71, 3);
       } else if (i === index && !correct) {
         // Opción seleccionada incorrecta en rojo
-        bg.setFillStyle(0xc0392b);
-        bg.setStrokeStyle(3, 0xe74c3c);
+        btnObj.drawBg(0xc0392b, 0xe74c3c, 3);
+        
+        // Shake animation para respuesta incorrecta
+        this.tweens.add({
+            targets: this.questionContainer,
+            x: '+=10',
+            duration: 50,
+            yoyo: true,
+            repeat: 5
+        });
+        
       } else {
-        bg.setFillStyle(0x7f8c8d);
+        btnObj.drawBg(0x7f8c8d, 0x95a5a6, 2);
       }
 
       btnObj.container.disableInteractive();
@@ -562,15 +518,13 @@ export default class QuestionScene extends Phaser.Scene {
     // Quitar highlight del anterior
     if (previousIndex >= 0 && previousIndex < this.optionButtons.length) {
       const prevBtn = this.optionButtons[previousIndex];
-      prevBtn.bg.setFillStyle(0x353b48);
-      prevBtn.bg.setStrokeStyle(2, 0x6c5ce7);
+      prevBtn.drawBg(0x353b48, 0x6c5ce7, 2);
     }
 
     // Agregar highlight al actual
     if (currentIndex >= 0 && currentIndex < this.optionButtons.length) {
       const currBtn = this.optionButtons[currentIndex];
-      currBtn.bg.setFillStyle(0x4a5a6f);
-      currBtn.bg.setStrokeStyle(3, 0xa29bfe);
+      currBtn.drawBg(0x4a5a6f, 0xa29bfe, 3);
     }
   }
 

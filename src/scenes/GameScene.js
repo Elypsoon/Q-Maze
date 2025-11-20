@@ -81,6 +81,21 @@ export default class GameScene extends Phaser.Scene {
     });
     this.loadingText.setOrigin(0.5);
     
+    // Animación de carga (spinner simple)
+    const spinner = this.add.graphics();
+    spinner.lineStyle(4, 0x3498db);
+    spinner.arc(0, 0, 30, 0, Phaser.Math.DegToRad(300), false);
+    this.loadingContainer.add(spinner);
+    spinner.x = width / 2;
+    spinner.y = height / 2 - 60;
+    
+    this.tweens.add({
+        targets: spinner,
+        angle: 360,
+        duration: 1000,
+        repeat: -1
+    });
+    
     this.loadingContainer.add([overlay, this.loadingText]);
     this.loadingContainer.setScrollFactor(0);
   }
@@ -115,7 +130,7 @@ export default class GameScene extends Phaser.Scene {
         });
     });
 
-    return button;
+    return null; // Removed 'button' which was undefined
   }
 
   async preloadData() {
@@ -247,6 +262,18 @@ export default class GameScene extends Phaser.Scene {
             }
           );
           questionMark.setOrigin(0.5);
+          
+          // Animación de rotación y escala para las zonas de pregunta
+          this.tweens.add({
+            targets: questionMark,
+            angle: { from: -10, to: 10 },
+            scaleX: { from: 0.95, to: 1.05 },
+            scaleY: { from: 0.95, to: 1.05 },
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+          });
           
           // Guardar referencia al texto para poder actualizarlo
           cell.questionMarkText = questionMark;
@@ -383,11 +410,22 @@ export default class GameScene extends Phaser.Scene {
       this.cellSize - 4,
       0x00b894
     );
-    this.add.text(startX, startY, 'INICIO', {
+    const startText = this.add.text(startX, startY, 'INICIO', {
       fontSize: Math.max(14, this.cellSize / 3.5) + 'px',
       fontFamily: 'Arial Black',
       color: '#ffffff'
-    }).setOrigin(0.5);
+    });
+    startText.setOrigin(0.5);
+    
+    // Animación de pulso suave en el inicio
+    this.tweens.add({
+      targets: start,
+      alpha: 0.6,
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
 
     // Marcar el final (dorado vibrante)
     const endX = this.mazeOffsetX + (this.mazeCols - 1) * this.cellSize + this.cellSize / 2;
@@ -405,6 +443,17 @@ export default class GameScene extends Phaser.Scene {
       color: '#ffffff'
     }).setOrigin(0.5);
 
+    // Animación de pulso en la meta
+    this.tweens.add({
+        targets: this.goal,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        alpha: 0.8,
+        duration: 800,
+        yoyo: true,
+        repeat: -1
+    });
+
     // Hacer la meta física para detectar colisión
     this.physics.add.existing(this.goal);
   }
@@ -420,6 +469,16 @@ export default class GameScene extends Phaser.Scene {
     );
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
+
+    // Animación de aparición
+    this.player.setScale(0);
+    this.tweens.add({
+        targets: this.player,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 500,
+        ease: 'Back.easeOut'
+    });
 
     // Colisiones físicas con paredes
     this.physics.add.collider(this.player, this.walls, this.onWallTouch, null, this);
@@ -451,16 +510,12 @@ export default class GameScene extends Phaser.Scene {
     const barWidth = Math.min(1000, width * 0.95);
     const barX = width / 2;
     
-    // Fondo de la barra
-    const bar = this.add.rectangle(
-      barX,
-      barY + barHeight / 2,
-      barWidth,
-      barHeight,
-      0x2d3436,
-      0.95
-    );
-    bar.setStrokeStyle(3, 0x6c5ce7);
+    // Fondo de la barra (Rounded)
+    const bar = this.add.graphics();
+    bar.fillStyle(0x2d3436, 0.95);
+    bar.lineStyle(3, 0x6c5ce7, 1);
+    bar.fillRoundedRect(barX - barWidth/2, barY, barWidth, barHeight, 15);
+    bar.strokeRoundedRect(barX - barWidth/2, barY, barWidth, barHeight, 15);
 
     // Tamaños de fuente adaptativos
     const mainFontSize = Math.min(20, width * 0.019);
@@ -609,6 +664,24 @@ export default class GameScene extends Phaser.Scene {
     // Solo lanzar pregunta si no está en invulnerabilidad y no hay pregunta activa
     if (!this.wallTouched && !this.questionActive && !this.invulnerable) {
       this.wallTouched = true;
+      
+      // Efecto visual de colisión: shake del jugador
+      this.tweens.add({
+        targets: player,
+        x: player.x + 3,
+        duration: 50,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Power1'
+      });
+      
+      // Flash rojo en el jugador
+      const originalColor = player.fillColor;
+      player.setFillStyle(0xff0000);
+      this.time.delayedCall(100, () => {
+        player.setFillStyle(originalColor);
+      });
+      
       this.launchQuestion('pared');
       
       // Reset después de un momento para evitar múltiples detecciones
@@ -652,6 +725,36 @@ export default class GameScene extends Phaser.Scene {
 
   onReachGoal(player, goal) {
     if (!this.gameOver) {
+      // Animación de celebración: jugador crece y brilla
+      this.tweens.add({
+        targets: player,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 300,
+        yoyo: true,
+        ease: 'Back.easeOut'
+      });
+      
+      // Partículas de celebración
+      for (let i = 0; i < 20; i++) {
+        const particle = this.add.circle(
+          player.x,
+          player.y,
+          5,
+          Phaser.Math.Between(0, 1) ? 0xffd700 : 0xffffff
+        );
+        this.tweens.add({
+          targets: particle,
+          x: player.x + Phaser.Math.Between(-80, 80),
+          y: player.y + Phaser.Math.Between(-80, 80),
+          alpha: 0,
+          scaleX: 0,
+          scaleY: 0,
+          duration: 800 + Phaser.Math.Between(0, 400),
+          ease: 'Power2'
+        });
+      }
+      
       const completionBonus = this.localConfig.COMPLETION_BONUS;
       const pointsPerSecond = this.localConfig.POINTS_PER_SECOND_LEFT;
       const pointsPerLife = this.localConfig.POINTS_PER_LIFE_LEFT;
@@ -721,6 +824,27 @@ export default class GameScene extends Phaser.Scene {
       this.showFeedback('¡Correcto!', 0x2ecc71);
     } else {
       this.lives--;
+      
+      // Efecto de partículas rojas cuando pierde una vida
+      for (let i = 0; i < 15; i++) {
+        const particle = this.add.circle(
+          this.player.x,
+          this.player.y,
+          4,
+          0xff0000
+        );
+        this.tweens.add({
+          targets: particle,
+          x: this.player.x + Phaser.Math.Between(-60, 60),
+          y: this.player.y + Phaser.Math.Between(-60, 60),
+          alpha: 0,
+          scaleX: 0,
+          scaleY: 0,
+          duration: 600 + Phaser.Math.Between(0, 300),
+          ease: 'Power2'
+        });
+      }
+      
       this.showFeedback('¡Incorrecto! -1 vida', 0xe74c3c);
       
       if (this.lives <= 0) {

@@ -63,7 +63,7 @@ export const GAME_CONFIG = {
     
     // Parámetros del juego
     LIVES: 3,                      // Vidas iniciales
-    TOTAL_TIME_LIMIT: 300,         // Tiempo total del laberinto en segundos
+    TOTAL_TIME_LIMIT: 270,         // Tiempo total del laberinto en segundos
     QUESTION_TIME_INTERVAL: 18,    // Intervalo de preguntas en segundos
     QUESTION_TIME_MODIFIER: 0,     // Sin modificación al tiempo del backend
     

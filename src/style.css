@@ -29,7 +29,15 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #1a1a2e;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 #game {
@@ -38,6 +46,62 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  box-shadow: 0 0 50px rgba(0,0,0,0.5);
+}
+
+/* Estilo para el input del nombre */
+#playerNameInput {
+  position: absolute;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 25px;
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.2) 0%, rgba(162, 155, 254, 0.2) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  font-family: 'Arial Black', sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  outline: none;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 
+    0 4px 15px rgba(108, 92, 231, 0.3),
+    0 0 0 2px rgba(108, 92, 231, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+#playerNameInput::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: normal;
+}
+
+#playerNameInput:hover {
+  box-shadow: 
+    0 6px 20px rgba(108, 92, 231, 0.4),
+    0 0 0 2px rgba(108, 92, 231, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+#playerNameInput:focus {
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.3) 0%, rgba(162, 155, 254, 0.3) 100%);
+  box-shadow: 
+    0 8px 30px rgba(0, 255, 245, 0.5),
+    0 0 0 3px rgba(0, 255, 245, 0.6),
+    0 0 20px rgba(0, 255, 245, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px) scale(1.03);
+}
+
+@keyframes inputGlow {
+  0%, 100% { box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3), 0 0 0 2px rgba(108, 92, 231, 0.5); }
+  50% { box-shadow: 0 4px 20px rgba(108, 92, 231, 0.5), 0 0 0 2px rgba(108, 92, 231, 0.7); }
+}
+
+#playerNameInput:not(:focus):not(:placeholder-shown) {
+  animation: inputGlow 2s ease-in-out infinite;
 }
 
 canvas {

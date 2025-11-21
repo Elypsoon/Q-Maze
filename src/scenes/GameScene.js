@@ -57,6 +57,12 @@ export default class GameScene extends Phaser.Scene {
     this.bestDistance = Infinity;
 
     this.isGameReady = false;
+    
+    // Variables para efectos de parpadeo de bordes
+    this.questionWarningActive = false;
+    this.timeWarningActive = false;
+    this.borderFlashTween = null;
+    this.timeBorderFlashTween = null;
   }
 
   create() {
@@ -188,6 +194,7 @@ export default class GameScene extends Phaser.Scene {
     this.createPlayer();
 
     this.createUI();
+    this.createBorderWarnings();
     
     // Aplicar volumen global
     if (window.gameSettings) {
@@ -526,6 +533,58 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.goal, this.onReachGoal, null, this);
   }
 
+  createBorderWarnings() {
+    // Crear advertencias visuales usando Graphics para mejor rendimiento (sin shaders costosos)
+    const mazeWidth = this.mazeCols * this.cellSize;
+    const mazeHeight = this.mazeRows * this.cellSize;
+    const startX = this.mazeOffsetX;
+    const startY = this.mazeOffsetY;
+    
+    console.log(`📐 Creando bordes de advertencia (Optimizado): ${mazeWidth}x${mazeHeight}`);
+
+    // --- Advertencia de Pregunta (ROJO) ---
+    this.questionWarningGraphics = this.add.graphics();
+    this.questionWarningGraphics.setDepth(95);
+    this.questionWarningGraphics.setScrollFactor(1);
+    this.questionWarningGraphics.setBlendMode(Phaser.BlendModes.ADD);
+    
+    // Dibujar "Glow" falso (capas semitransparentes superpuestas)
+    // Capa exterior difusa
+    this.questionWarningGraphics.lineStyle(20, 0xff0000, 0.15);
+    this.questionWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    // Capa media
+    this.questionWarningGraphics.lineStyle(10, 0xff0000, 0.4);
+    this.questionWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    // Núcleo brillante
+    this.questionWarningGraphics.lineStyle(3, 0xffffff, 0.8); // Blanco para núcleo más intenso
+    this.questionWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    this.questionWarningGraphics.setAlpha(0); // Inicialmente invisible
+
+    // --- Advertencia de Tiempo (NARANJA) ---
+    this.timeWarningGraphics = this.add.graphics();
+    this.timeWarningGraphics.setDepth(95);
+    this.timeWarningGraphics.setScrollFactor(1);
+    this.timeWarningGraphics.setBlendMode(Phaser.BlendModes.ADD);
+    
+    // Dibujar "Glow" falso
+    this.timeWarningGraphics.lineStyle(20, 0xff6b00, 0.15);
+    this.timeWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    this.timeWarningGraphics.lineStyle(10, 0xff6b00, 0.4);
+    this.timeWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    // Núcleo brillante
+    this.timeWarningGraphics.lineStyle(3, 0xffffff, 0.8);
+    this.timeWarningGraphics.strokeRect(startX, startY, mazeWidth, mazeHeight);
+    
+    this.timeWarningGraphics.setAlpha(0); // Inicialmente invisible
+    
+    console.log('✅ Bordes de advertencia creados (Modo Rendimiento)');
+  }
+
   createUI() {
     // Limpiar UI anterior si existe
     if (this.uiContainer) {
@@ -691,8 +750,128 @@ export default class GameScene extends Phaser.Scene {
     if (this.timeSinceLastQuestion >= this.questionTimeInterval) {
       this.launchQuestion('tiempo');
     }
+    
+    // Activar advertencia de pregunta cuando queden 3 segundos o menos
+    const timeUntilQuestion = this.questionTimeInterval - this.timeSinceLastQuestion;
+    if (timeUntilQuestion <= 3 && timeUntilQuestion > 0 && !this.questionWarningActive) {
+      console.log(`⚠️ Activando advertencia de pregunta - Quedan ${timeUntilQuestion}s`);
+      this.startQuestionWarning();
+    } else if (timeUntilQuestion > 3 && this.questionWarningActive) {
+      this.stopQuestionWarning();
+    }
+    
+    // Activar advertencia de tiempo total cuando quede 1 minuto o menos
+    const timeLeft = this.totalTimeLimit - this.timeElapsed;
+    if (timeLeft <= 60 && timeLeft > 0 && !this.timeWarningActive) {
+      console.log(`⏰ Activando advertencia de tiempo total - Quedan ${timeLeft}s`);
+      this.startTimeWarning(timeLeft);
+    } else if (timeLeft > 60 && this.timeWarningActive) {
+      this.stopTimeWarning();
+    } else if (timeLeft <= 60 && this.timeWarningActive) {
+      // Actualizar velocidad del parpadeo según tiempo restante
+      this.updateTimeWarningSpeed(timeLeft);
+    }
 
     this.updateUI();
+  }
+
+  startQuestionWarning() {
+    this.questionWarningActive = true;
+    
+    // Verificar que los gráficos existan
+    if (!this.questionWarningGraphics) {
+      console.error('❌ Gráficos de advertencia de pregunta no inicializados');
+      return;
+    }
+    
+    console.log('⚠️ Advertencia de pregunta activada (bordes rojos)');
+    
+    // Parpadeo rápido (200ms)
+    this.borderFlashTween = this.tweens.add({
+      targets: this.questionWarningGraphics,
+      alpha: { from: 0, to: 1 },
+      duration: 200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+  
+  stopQuestionWarning() {
+    this.questionWarningActive = false;
+    
+    if (this.borderFlashTween) {
+      this.borderFlashTween.remove();
+      this.borderFlashTween = null;
+    }
+    
+    if (this.questionWarningGraphics) {
+      this.questionWarningGraphics.setAlpha(0);
+    }
+  }
+  
+  startTimeWarning(timeLeft) {
+    this.timeWarningActive = true;
+    
+    // Verificar que los gráficos existan
+    if (!this.timeWarningGraphics) {
+      console.error('❌ Gráficos de advertencia de tiempo no inicializados');
+      return;
+    }
+    
+    console.log(`⏰ Advertencia de tiempo activada (bordes naranjas) - Quedan ${timeLeft}s`);
+    
+    // Calcular duración inicial (más lento al principio, acelera con el tiempo)
+    const duration = this.calculateWarningDuration(timeLeft);
+    
+    this.timeBorderFlashTween = this.tweens.add({
+      targets: this.timeWarningGraphics,
+      alpha: { from: 0, to: 1 },
+      duration: duration,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+  
+  stopTimeWarning() {
+    this.timeWarningActive = false;
+    
+    if (this.timeBorderFlashTween) {
+      this.timeBorderFlashTween.remove();
+      this.timeBorderFlashTween = null;
+    }
+    
+    if (this.timeWarningGraphics) {
+      this.timeWarningGraphics.setAlpha(0);
+    }
+  }
+  
+  updateTimeWarningSpeed(timeLeft) {
+    if (!this.timeBorderFlashTween) return;
+    
+    const newDuration = this.calculateWarningDuration(timeLeft);
+    
+    // Recrear el tween con nueva velocidad
+    this.timeBorderFlashTween.remove();
+    
+    this.timeBorderFlashTween = this.tweens.add({
+      targets: this.timeWarningGraphics,
+      alpha: { from: 0, to: 1 },
+      duration: newDuration,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+  
+  calculateWarningDuration(timeLeft) {
+    // 60 segundos -> 800ms, 30 segundos -> 500ms, 10 segundos -> 250ms, 0 segundos -> 150ms
+    // Interpolación logarítmica para acelerar progresivamente
+    const minDuration = 150;
+    const maxDuration = 800;
+    const progress = timeLeft / 60; // 0 a 1
+    return maxDuration - (maxDuration - minDuration) * Math.pow(1 - progress, 1.5);
   }
 
   onWallTouch(player, wall) {
@@ -835,6 +1014,11 @@ export default class GameScene extends Phaser.Scene {
     
     this.questionActive = true;
     this.timeSinceLastQuestion = 0;
+    
+    // Detener advertencia de pregunta si está activa
+    if (this.questionWarningActive) {
+      this.stopQuestionWarning();
+    }
 
     // Seleccionar una pregunta de forma rotativa/aleatoria
     if (this.questionIndex >= this.questionsBank.length) {
@@ -997,6 +1181,14 @@ export default class GameScene extends Phaser.Scene {
     // Detener el jugador
     this.player.body.setVelocity(0);
     
+    // Detener advertencias de bordes
+    if (this.questionWarningActive) {
+      this.stopQuestionWarning();
+    }
+    if (this.timeWarningActive) {
+      this.stopTimeWarning();
+    }
+    
     // Detener música del juego
     if (this.gameMusic) {
       this.gameMusic.stop();
@@ -1010,10 +1202,17 @@ export default class GameScene extends Phaser.Scene {
       this.sound.play('lose', { volume: 0.6 });
     }
     
+    // Ejecutar animación según resultado
+    if (won) {
+      await this.playVictoryAnimation();
+    } else {
+      await this.playDefeatAnimation();
+    }
+    
     // Enviar resultados al backend y esperar
     await this.submitGameSession(won);
 
-    // Mostrar mensaje final
+    // Mostrar mensaje final con puntuación prominente
     const controlText = this.bluetoothController && this.bluetoothController.isConnected() 
       ? 'Presiona ESPACIO o Botón Arcade' 
       : 'Presiona ESPACIO';
@@ -1021,9 +1220,9 @@ export default class GameScene extends Phaser.Scene {
     const finalMessage = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.centerY,
-      message + '\n' +
-      `Puntuación final: ${this.score} pts\n` +
-      `Tiempo usado: ${Math.floor(this.timeElapsed)}s\n\n` +
+      message + '\n\n' +
+      `🎯 PUNTUACIÓN FINAL: ${this.score} pts\n` +
+      `⏱️ Tiempo usado: ${Math.floor(this.timeElapsed)}s\n\n` +
       controlText + ' para volver al menú',
       {
         fontSize: '24px',
@@ -1037,11 +1236,144 @@ export default class GameScene extends Phaser.Scene {
     );
     finalMessage.setOrigin(0.5);
     finalMessage.setScrollFactor(0);
+    finalMessage.setDepth(1000); // Asegurar que esté por encima de todo
 
     // Permitir volver al menú con SPACE (teclado) o botón Arcade (Bluetooth)
     this.waitingForReturn = true;
     this.input.keyboard.once('keydown-SPACE', () => {
       this.returnToMenu();
+    });
+  }
+
+  playDefeatAnimation() {
+    return new Promise((resolve) => {
+      const playerX = this.player.x;
+      const playerY = this.player.y;
+      const playerRadius = this.player.radius;
+      
+      // Crear explosión de partículas desde el jugador
+      const particleCount = 30;
+      const particles = [];
+      
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (Math.PI * 2 * i) / particleCount;
+        const speed = Phaser.Math.Between(80, 150);
+        const size = Phaser.Math.Between(4, 10);
+        
+        const particle = this.add.circle(playerX, playerY, size, this.player.fillColor);
+        particle.setDepth(50);
+        particles.push(particle);
+        
+        // Animar partícula hacia afuera
+        this.tweens.add({
+          targets: particle,
+          x: playerX + Math.cos(angle) * speed,
+          y: playerY + Math.sin(angle) * speed,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 1200,
+          ease: 'Power2'
+        });
+      }
+      
+      // Hacer que el jugador se vuelva semi-transparente y se encoja
+      this.tweens.add({
+        targets: this.player,
+        alpha: 0.3,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        duration: 800,
+        ease: 'Power2',
+        onComplete: () => {
+          // Mantener visible pero muy tenue
+          this.player.setAlpha(0.2);
+          resolve();
+        }
+      });
+      
+      // Agregar efecto de shake a la cámara
+      this.cameras.main.shake(500, 0.01);
+    });
+  }
+  
+  playVictoryAnimation() {
+    return new Promise((resolve) => {
+      const playerX = this.player.x;
+      const playerY = this.player.y;
+      
+      // Efecto de salto de celebración
+      this.tweens.add({
+        targets: this.player,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 200,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Sine.easeInOut'
+      });
+      
+      // Crear confeti de colores
+      const confettiColors = [0xffd700, 0xff6b6b, 0x4ecdc4, 0x95e1d3, 0xf38181, 0xaa96da];
+      const confettiCount = 50;
+      
+      for (let i = 0; i < confettiCount; i++) {
+        const angle = (Math.PI * 2 * i) / confettiCount + Phaser.Math.FloatBetween(-0.2, 0.2);
+        const distance = Phaser.Math.Between(100, 200);
+        const size = Phaser.Math.Between(5, 12);
+        const color = Phaser.Utils.Array.GetRandom(confettiColors);
+        const delay = Phaser.Math.Between(0, 300);
+        
+        const confetti = this.add.circle(playerX, playerY, size, color);
+        confetti.setDepth(50);
+        
+        // Animar confeti con rotación y caída
+        this.tweens.add({
+          targets: confetti,
+          x: playerX + Math.cos(angle) * distance + Phaser.Math.Between(-50, 50),
+          y: playerY - Phaser.Math.Between(50, 150) + (distance * 0.5), // Subir y luego caer
+          alpha: 0,
+          angle: Phaser.Math.Between(0, 720),
+          scaleX: 0.2,
+          scaleY: 0.2,
+          duration: 1500,
+          delay: delay,
+          ease: 'Cubic.easeOut'
+        });
+      }
+      
+      // Efecto de destello en el jugador
+      this.tweens.add({
+        targets: this.player,
+        alpha: { from: 1, to: 0.6 },
+        duration: 150,
+        yoyo: true,
+        repeat: 4,
+        onComplete: () => {
+          this.player.setAlpha(1);
+          resolve();
+        }
+      });
+      
+      // Flash de luz en la pantalla
+      const flash = this.add.rectangle(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY,
+        this.cameras.main.width,
+        this.cameras.main.height,
+        0xffffff,
+        0.5
+      );
+      flash.setScrollFactor(0);
+      flash.setDepth(45);
+      
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 600,
+        ease: 'Power2',
+        onComplete: () => flash.destroy()
+      });
     });
   }
 

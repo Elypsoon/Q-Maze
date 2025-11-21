@@ -68,6 +68,29 @@ export default class MenuScene extends Phaser.Scene {
     graphics.fillRect(0, 0, width, height);
     this.menuContainer.add(graphics);
 
+    // Crear textura para partículas si no existe
+    if (!this.textures.exists('particle')) {
+        const particleGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        particleGraphics.fillStyle(0xffffff, 1);
+        particleGraphics.fillCircle(4, 4, 4);
+        particleGraphics.generateTexture('particle', 8, 8);
+    }
+
+    // Partículas de fondo
+    const particles = this.add.particles(0, 0, 'particle', {
+        x: { min: 0, max: width },
+        y: { min: 0, max: height },
+        quantity: 2,
+        frequency: 100,
+        lifespan: 4000,
+        gravityY: -10,
+        speed: { min: 10, max: 30 },
+        scale: { start: 0.5, end: 0 },
+        alpha: { start: 0.4, end: 0 },
+        blendMode: 'ADD'
+    });
+    this.menuContainer.add(particles);
+
     // Título del juego - ajustado al tamaño de pantalla
     const titleSize = Math.min(100, width / 10);
     const title = this.add.text(width / 2, height * 0.15, 'Q-MAZE', {

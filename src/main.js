@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import PreloadScene from "./scenes/PreloadScene";
 import MenuScene from "./scenes/MenuScene";
 import GameScene from "./scenes/GameScene";
 import QuestionScene from "./scenes/QuestionScene";
@@ -19,7 +20,7 @@ const config = {
     // Obtiene la mejor resolución posible según el dispositivo
     resolution: Math.max(2, window.devicePixelRatio || 2),
   },
-  scene: [MenuScene, GameScene, QuestionScene, BluetoothSetupScene],
+  scene: [PreloadScene, MenuScene, GameScene, QuestionScene, BluetoothSetupScene],
   physics: {
     default: "arcade",
     arcade: {

@@ -17,6 +17,17 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   create() {
+    // Iniciar música del menú en loop (verificar si ya existe y está sonando)
+    const existingMusic = this.sound.get('menuMusic');
+    if (!existingMusic || !existingMusic.isPlaying) {
+      if (existingMusic) {
+        existingMusic.play();
+      } else {
+        this.menuMusic = this.sound.add('menuMusic', { loop: true, volume: 0.5 });
+        this.menuMusic.play();
+      }
+    }
+    
     this.createMenu();
     
     // Escuchar cambios de tamaño
@@ -194,6 +205,11 @@ export default class MenuScene extends Phaser.Scene {
       
       // Limpiar el input antes de cambiar de escena
       this.cleanupNameInput();
+      
+      // Detener música del menú
+      if (this.menuMusic) {
+        this.menuMusic.stop();
+      }
 
       this.scene.start('GameScene', { 
         seed: Date.now(),

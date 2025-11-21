@@ -12,6 +12,14 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init(data) {
+    // Variable para controlar si la música ya está sonando
+    // No resetear si ya existe y está sonando (para persistir al reiniciar)
+    if (!this.gameMusicPlaying) {
+      this.gameMusicPlaying = false;
+    }
+    if (!this.lastCrashSound) {
+      this.lastCrashSound = null;
+    }
     const difficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
     this.difficulty = difficulty;
     this.localConfig = getConfigForDifficulty(difficulty);
@@ -149,7 +157,8 @@ export default class GameScene extends Phaser.Scene {
             options: JSON.parse(question.options) 
         }));
         
-        this.questionTimeInterval = (this.gameConfig && this.gameConfig.QUESTION_TIME_INTERVAL) || 20;
+        // NO sobrescribir questionTimeInterval aquí, ya se asignó desde localConfig en init()
+        // this.questionTimeInterval ya tiene el valor correcto según la dificultad
 
         console.log('✅ Datos del servidor cargados: Config y Preguntas');
     } catch (error) {
@@ -169,6 +178,18 @@ export default class GameScene extends Phaser.Scene {
     this.createPlayer();
 
     this.createUI();
+    
+    // Iniciar música del juego en loop (solo si no está sonando)
+    // Verificar si ya existe una instancia tocando
+    if (this.gameMusic && this.gameMusic.isPlaying) {
+      // La música ya está sonando, no hacer nada
+      this.gameMusicPlaying = true;
+    } else if (!this.gameMusicPlaying) {
+      // Crear y reproducir la música
+      this.gameMusic = this.sound.add('gameMusic', { loop: true, volume: 0.4 });
+      this.gameMusic.play();
+      this.gameMusicPlaying = true;
+    }
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -665,6 +686,11 @@ export default class GameScene extends Phaser.Scene {
     if (!this.wallTouched && !this.questionActive && !this.invulnerable && !this.gameOver) {
       this.wallTouched = true;
       
+      // Reproducir sonido de crash aleatorio
+      const crashSound = this.lastCrashSound === 'crash1' ? 'crash2' : 'crash1';
+      this.sound.play(crashSound, { volume: 0.6 });
+      this.lastCrashSound = crashSound;
+      
       // Efecto visual de colisión: shake del jugador
       this.tweens.add({
         targets: player,
@@ -805,6 +831,11 @@ export default class GameScene extends Phaser.Scene {
 
     // Pausar el movimiento del jugador
     this.player.body.setVelocity(0);
+    
+    // Pausar música del juego (NO detener para que continúe después)
+    if (this.gameMusic) {
+      this.gameMusic.pause();
+    }
 
     // Iniciar la escena de preguntas
     this.scene.pause();
@@ -822,6 +853,11 @@ export default class GameScene extends Phaser.Scene {
   onQuestionAnswered(correct) {
     this.questionActive = false;
     this.scene.resume();
+    
+    // Reanudar música del juego
+    if (this.gameMusic && !this.gameMusic.isPlaying) {
+      this.gameMusic.resume();
+    }
 
     // Si es correcta, solo mostrar feedback (sin puntos)
     if (correct) {
@@ -945,6 +981,19 @@ export default class GameScene extends Phaser.Scene {
     
     // Detener el jugador
     this.player.body.setVelocity(0);
+    
+    // Detener música del juego
+    if (this.gameMusic) {
+      this.gameMusic.stop();
+      this.gameMusicPlaying = false;
+    }
+    
+    // Reproducir sonido de victoria o derrota
+    if (won) {
+      this.sound.play('win', { volume: 0.6 });
+    } else {
+      this.sound.play('lose', { volume: 0.6 });
+    }
     
     // Enviar resultados al backend y esperar
     await this.submitGameSession(won);
@@ -1164,6 +1213,10 @@ export default class GameScene extends Phaser.Scene {
   restartGame() {
     this.hidePauseMenu();
     this.scene.stop('QuestionScene');
+    
+    // NO detener música del juego al reiniciar, dejarla continuar
+    // La música sigue sonando en el reinicio
+    
     this.scene.restart({ 
       seed: Date.now(),
       bluetoothController: this.bluetoothController,
@@ -1175,6 +1228,13 @@ export default class GameScene extends Phaser.Scene {
   exitToMenu() {
     this.hidePauseMenu();
     this.scene.stop('QuestionScene');
+    
+    // Detener música del juego
+    if (this.gameMusic) {
+      this.gameMusic.stop();
+      this.gameMusicPlaying = false;
+    }
+    
     this.scene.start('MenuScene', { 
       bluetoothController: this.bluetoothController,
       difficulty: this.difficulty,

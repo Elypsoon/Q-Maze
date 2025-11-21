@@ -43,6 +43,10 @@ export default class QuestionScene extends Phaser.Scene {
   create() {
     // Asegura que la escena esté en estado RUNNING ---
     this.scene.resume();
+    
+    // Reproducir música de preguntas
+    this.questionsMusic = this.sound.add('questionsMusic', { loop: true, volume: 0.5 });
+    this.questionsMusic.play();
 
     this.createQuestionUI();
     
@@ -335,6 +339,11 @@ export default class QuestionScene extends Phaser.Scene {
 
     this.answered = true;
     this.selectedOption = index;
+    
+    // Detener música de preguntas
+    if (this.questionsMusic) {
+      this.questionsMusic.stop();
+    }
     
     /*
     if (this.timerEvent) {

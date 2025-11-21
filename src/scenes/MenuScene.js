@@ -10,13 +10,26 @@ export default class MenuScene extends Phaser.Scene {
     this.selectedDifficulty = data.difficulty || DIFFICULTY_LEVELS.MEDIUM;
     this.bluetoothController = data.bluetoothController || window.bluetoothController;
     
-    this.playerName = data.playerName || 'Runner';
+    // Inicializar configuración global si no existe
+    if (!window.gameSettings) {
+      window.gameSettings = {
+        volume: 0.5,
+        playerName: 'Runner',
+        selectedCategory: 'all'
+      };
+    }
+    
+    // Usar nombre de la configuración global
+    this.playerName = window.gameSettings.playerName;
     
     // Flag para saber si venimos de otra escena (no animar si es true)
     this.skipAnimations = data.skipAnimations || false;
   }
 
   create() {
+    // Aplicar volumen global
+    this.sound.setVolume(window.gameSettings.volume);
+    
     // Iniciar música del menú en loop (verificar si ya existe y está sonando)
     const existingMusic = this.sound.get('menuMusic');
     if (!existingMusic || !existingMusic.isPlaying) {
@@ -200,11 +213,8 @@ export default class MenuScene extends Phaser.Scene {
     const buttonWidth = Math.min(240, width / 4.5);
     const buttonHeight = Math.min(55, height / 13);
     const playButton = this.createButton(width / 2, height * 0.68, 'JUGAR', buttonWidth, buttonHeight, () => {
-      // Usar el nombre ingresado en el input
-      const playerName = this.playerName || 'Runner';
-      
-      // Limpiar el input antes de cambiar de escena
-      this.cleanupNameInput();
+      // Usar el nombre de la configuración global
+      const playerName = window.gameSettings.playerName;
       
       // Detener música del menú
       if (this.menuMusic) {
@@ -214,8 +224,8 @@ export default class MenuScene extends Phaser.Scene {
       this.scene.start('GameScene', { 
         seed: Date.now(),
         bluetoothController: window.bluetoothController,
-        playerName: playerName, // PASA EL NOMBRE AL INICIAR GameScene
-        difficulty: this.selectedDifficulty // PASA LA DIFICULTAD SELECCIONADA
+        playerName: playerName,
+        difficulty: this.selectedDifficulty
       });
     });
     
@@ -238,23 +248,20 @@ export default class MenuScene extends Phaser.Scene {
     const bluetoothButton = this.createButton(
       width / 2, 
       height * 0.76, 
-      'Mando BT', 
+      'Mando', 
       buttonWidth, 
       buttonHeight, 
       () => {
-        // Limpiar el input antes de cambiar de escena
-        this.cleanupNameInput();
-        
         this.scene.start('BluetoothSetupScene', { 
           bluetoothController: window.bluetoothController,
           difficulty: this.selectedDifficulty,
-          playerName: this.playerName
+          playerName: window.gameSettings.playerName
         });
       },
-      0x3498db
+      0x9b59b6
     );
     
-    // Animación de entrada para el botón de bluetooth (solo si no se saltan animaciones)
+    // Animación de entrada para el botón de Bluetooth (solo si no se saltan animaciones)
     if (!this.skipAnimations) {
       bluetoothButton.setAlpha(0);
       bluetoothButton.setScale(0.8);
@@ -268,131 +275,52 @@ export default class MenuScene extends Phaser.Scene {
         ease: 'Back.easeOut'
       });
     }
-
-    // Campo de nombre del jugador (debajo del botón BT, en horizontal)
-    const nameSize = Math.min(18, width / 50);
-    const nameLabel = this.add.text(width / 2 - 120, height * 0.84, 'Nombre:', {
-       fontSize: nameSize + 'px',
-      fontFamily: 'Arial',
-      color: '#ecf0f1'
-    });
-    nameLabel.setOrigin(0.5);
-
-    // Input HTML para el nombre (en la misma línea horizontal)
-    const inputWidth = Math.min(200, width * 0.25);
-    const inputHeight = Math.min(34, height / 24);
     
-    const inputElement = document.createElement('input');
-    inputElement.type = 'text';
-    inputElement.id = 'playerNameInput';
-    inputElement.value = this.playerName;
-    inputElement.placeholder = 'Runner';
-    inputElement.maxLength = 20;
-    
-    // Estilos inline completos para máxima compatibilidad (especialmente en Brave)
-    inputElement.style.position = 'absolute';
-    inputElement.style.left = `${(width / 2) + 10}px`;
-    inputElement.style.top = `${height * 0.84 - (inputHeight / 2)}px`;
-    inputElement.style.width = `${inputWidth}px`;
-    inputElement.style.height = `${inputHeight}px`;
-    inputElement.style.zIndex = '1000';
-    
-    // Estilos visuales (forzados inline para Brave)
-    inputElement.style.padding = '10px 16px';
-    inputElement.style.border = '3px solid #6c5ce7';
-    inputElement.style.borderRadius = '25px';
-    inputElement.style.background = 'rgba(45, 52, 54, 0.95)';
-    inputElement.style.color = '#ffffff';
-    inputElement.style.fontFamily = 'Arial Black, sans-serif';
-    inputElement.style.fontSize = '16px';
-    inputElement.style.fontWeight = 'bold';
-    inputElement.style.textAlign = 'center';
-    inputElement.style.letterSpacing = '0.5px';
-    inputElement.style.outline = 'none';
-    inputElement.style.boxShadow = '0 6px 20px rgba(108, 92, 231, 0.6), 0 0 30px rgba(108, 92, 231, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.1)';
-    inputElement.style.transition = 'all 0.3s ease';
-    
-    inputElement.addEventListener('input', (e) => {
-      this.playerName = e.target.value.trim() || 'Runner';
-    });
-    
-    // Eventos para efectos hover y focus
-    inputElement.addEventListener('mouseenter', () => {
-      inputElement.style.transform = 'translateY(-2px) scale(1.02)';
-      inputElement.style.boxShadow = '0 8px 25px rgba(108, 92, 231, 0.7), 0 0 40px rgba(108, 92, 231, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.15)';
-      inputElement.style.borderColor = '#a29bfe';
-    });
-    
-    inputElement.addEventListener('mouseleave', () => {
-      if (document.activeElement !== inputElement) {
-        inputElement.style.transform = 'translateY(0) scale(1)';
-        inputElement.style.boxShadow = '0 6px 20px rgba(108, 92, 231, 0.6), 0 0 30px rgba(108, 92, 231, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.1)';
-        inputElement.style.borderColor = '#6c5ce7';
-      }
-    });
-    
-    inputElement.addEventListener('focus', () => {
-      inputElement.style.transform = 'translateY(-3px) scale(1.03)';
-      inputElement.style.boxShadow = '0 10px 35px rgba(0, 255, 245, 0.6), 0 0 50px rgba(0, 255, 245, 0.4), 0 0 20px rgba(0, 255, 245, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.2)';
-      inputElement.style.borderColor = '#00fff5';
-      inputElement.style.background = 'rgba(45, 52, 54, 1)';
-    });
-    
-    inputElement.addEventListener('blur', () => {
-      inputElement.style.transform = 'translateY(0) scale(1)';
-      inputElement.style.boxShadow = '0 6px 20px rgba(108, 92, 231, 0.6), 0 0 30px rgba(108, 92, 231, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.1)';
-      inputElement.style.borderColor = '#6c5ce7';
-      inputElement.style.background = 'rgba(45, 52, 54, 0.95)';
-    });
-    
-    document.body.appendChild(inputElement);
-    this.nameInput = inputElement;
-    
-    // Animación de entrada para el input (solo si no se saltan animaciones)
-    if (!this.skipAnimations) {
-      inputElement.style.opacity = '0';
-      inputElement.style.transform = 'translateY(10px)';
-      setTimeout(() => {
-        inputElement.style.transition = 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        inputElement.style.opacity = '1';
-        inputElement.style.transform = 'translateY(0)';
-      }, 600);
-    } else {
-      inputElement.style.opacity = '1';
-    }
-
-    // Agregar elementos al contenedor (no el input HTML, ese está en el DOM)
-    this.menuContainer.add([title, subtitle, description, diffLabel, nameLabel, this.difficultyDescription]);
-
-    // Animación de parpadeo en el título
-    this.titleTween = this.tweens.add({
-      targets: title,
-      scaleX: 1.05,
-      scaleY: 1.05,
-      duration: 1000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
-    });
-    
-    // Animación de entrada para los elementos del menú (solo si no se saltan animaciones)
-    if (!this.skipAnimations) {
-      const elements = [subtitle, description, diffLabel, this.difficultyDescription, nameLabel];
-      elements.forEach((element, index) => {
-        element.setAlpha(0);
-        element.setY(element.y + 20);
-        this.tweens.add({
-          targets: element,
-          alpha: 1,
-          y: element.y - 20,
-          duration: 500,
-          delay: 100 + (index * 100),
-          ease: 'Back.easeOut'
+    // Botón de Opciones
+    const optionsButton = this.createButton(
+      width / 2,
+      height * 0.84,
+      'Opciones',
+      buttonWidth,
+      buttonHeight,
+      () => {
+        this.scene.start('OptionsScene', {
+          bluetoothController: window.bluetoothController,
+          difficulty: this.selectedDifficulty
         });
+      },
+      0xe67e22
+    );
+    
+    // Animación de entrada para el botón de opciones (solo si no se saltan animaciones)
+    if (!this.skipAnimations) {
+      optionsButton.setAlpha(0);
+      optionsButton.setScale(0.8);
+      this.tweens.add({
+        targets: optionsButton,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 400,
+        delay: 900,
+        ease: 'Back.easeOut'
       });
     }
-    
-    // Añadir partículas de fondo
+
+    this.menuContainer.add([
+      title,
+      subtitle,
+      description,
+      diffLabel,
+      this.easyButton,
+      this.mediumButton,
+      this.hardButton,
+      playButton,
+      bluetoothButton,
+      optionsButton
+    ]);
+
+    // Crear partículas de fondo para darle vida
     this.createBackgroundParticles(width, height);
   }
 

@@ -44,6 +44,11 @@ export default class QuestionScene extends Phaser.Scene {
     // Asegura que la escena esté en estado RUNNING ---
     this.scene.resume();
     
+    // Aplicar volumen global
+    if (window.gameSettings) {
+      this.sound.setVolume(window.gameSettings.volume);
+    }
+    
     // Reproducir música de preguntas
     this.questionsMusic = this.sound.add('questionsMusic', { loop: true, volume: 0.5 });
     this.questionsMusic.play();
@@ -163,7 +168,7 @@ export default class QuestionScene extends Phaser.Scene {
     // Título según la razón
     const reasons = {
       'pared': '⚠️ ¡Tocaste una pared!',
-      'tiempo': '⏰ ¡Se acabó el tiempo!',
+      'tiempo': '⏰ ¡Tiempo de pregunta!',
       'zona': '❓ ¡Zona de pregunta!'
     };
     

@@ -13,7 +13,6 @@ export default class GameScene extends Phaser.Scene {
 
   init(data) {
     // Variable para controlar si la música ya está sonando
-    // No resetear si ya existe y está sonando (para persistir al reiniciar)
     if (!this.gameMusicPlaying) {
       this.gameMusicPlaying = false;
     }
@@ -138,7 +137,7 @@ export default class GameScene extends Phaser.Scene {
         });
     });
 
-    return null; // Removed 'button' which was undefined
+    return null;
   }
 
   async preloadData() {
@@ -147,7 +146,18 @@ export default class GameScene extends Phaser.Scene {
         if (!configResponse.ok) throw new Error('Error al cargar la configuración del juego');
         this.gameConfig = await configResponse.json();
         
-        const questionsResponse = await fetch(`${API_BASE_URL}/questions`);
+        // Obtener categorías seleccionadas de la configuración global
+        const selectedCategories = window.gameSettings ? window.gameSettings.selectedCategories : ['all'];
+        
+        // Construir URL con parámetros de categoría
+        let questionsUrl = `${API_BASE_URL}/questions`;
+        if (selectedCategories && !selectedCategories.includes('all')) {
+          // Añadir múltiples parámetros category para cada categoría seleccionada
+          const categoryParams = selectedCategories.map(cat => `category=${encodeURIComponent(cat)}`).join('&');
+          questionsUrl += `?${categoryParams}`;
+        }
+        
+        const questionsResponse = await fetch(questionsUrl);
         if (!questionsResponse.ok) throw new Error('Error al cargar el banco de preguntas');
         
         let rawQuestions = await questionsResponse.json();
@@ -163,7 +173,7 @@ export default class GameScene extends Phaser.Scene {
         console.log('✅ Datos del servidor cargados: Config y Preguntas');
     } catch (error) {
         console.error('❌ Error al conectar con el backend:', error);
-        this.showErrorAndExit('Error de red. Asegúrate de que el backend esté corriendo en puerto 3000.');
+        this.showErrorAndExit('Error de red. Asegúrate de que el backend esté corriendo.');
         throw error;
     }
   }
@@ -178,6 +188,11 @@ export default class GameScene extends Phaser.Scene {
     this.createPlayer();
 
     this.createUI();
+    
+    // Aplicar volumen global
+    if (window.gameSettings) {
+      this.sound.setVolume(window.gameSettings.volume);
+    }
     
     // Iniciar música del juego en loop (solo si no está sonando)
     // Verificar si ya existe una instancia tocando
@@ -954,7 +969,7 @@ export default class GameScene extends Phaser.Scene {
       score: finalScore,
       timeTaken: Math.floor(this.timeElapsed),
       result: won ? 'win' : 'loss',
-      answers: this.sessionAnswers, // Si quieres guardar las respuestas, deberás recolectarlas durante el juego
+      answers: this.sessionAnswers,
     };
 
     try {

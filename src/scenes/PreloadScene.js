@@ -81,6 +81,18 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   create() {
+    // Inicializar configuración global si no existe
+    if (!window.gameSettings) {
+      window.gameSettings = {
+        volume: 0.5,
+        playerName: 'Runner',
+        selectedCategories: ['all'] // Array para múltiples categorías
+      };
+    }
+    
+    // Aplicar volumen global
+    this.sound.setVolume(window.gameSettings.volume);
+    
     // Pequeña pausa para mostrar "¡Listo!" y luego ir al menú
     this.time.delayedCall(500, () => {
       this.scene.start('MenuScene');

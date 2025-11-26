@@ -93,9 +93,20 @@ export default class PreloadScene extends Phaser.Scene {
     // Aplicar volumen global
     this.sound.setVolume(window.gameSettings.volume);
     
+    // Asegurar que el BluetoothController esté disponible globalmente
+    if (!window.bluetoothController) {
+      console.warn('⚠️ BluetoothController no encontrado en window, creando nueva instancia');
+      // Importación dinámica por si acaso
+      import('../services/BluetoothController').then((module) => {
+        window.bluetoothController = new module.default();
+      });
+    }
+    
     // Pequeña pausa para mostrar "¡Listo!" y luego ir al menú
     this.time.delayedCall(500, () => {
-      this.scene.start('MenuScene');
+      this.scene.start('MenuScene', {
+        bluetoothController: window.bluetoothController
+      });
     });
   }
 }

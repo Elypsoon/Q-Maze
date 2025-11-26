@@ -219,11 +219,11 @@ export default class GameScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     if (this.bluetoothController) {
-      this.bluetoothController.on('data', (events) => {
-        if (!this.gameOver && !this.questionActive) {
-          this.inputManager.updateFromBluetooth(events);
-        }
-      });
+      this.bluetoothDataHandler = (events) => {
+        // Siempre actualizar InputManager (incluso en gameOver para el bot\u00f3n de retorno)
+        this.inputManager.updateFromBluetooth(events);
+      };
+      this.bluetoothController.on('data', this.bluetoothDataHandler);
 
       this.bluetoothController.on('disconnect', () => {
         console.log('Controlador Bluetooth desconectado durante el juego');
@@ -1412,6 +1412,10 @@ export default class GameScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
     
+    // Inicializar selección de pausa
+    this.selectedPauseOption = 0; // 0=Reanudar, 1=Reiniciar, 2=Salir
+    this.pauseNavigationCooldown = false;
+    
     // Contenedor para el menú de pausa
     this.pauseContainer = this.add.container(0, 0);
     this.pauseContainer.setScrollFactor(0);
@@ -1488,7 +1492,25 @@ export default class GameScene extends Phaser.Scene {
     });
     instruction.setOrigin(0.5);
     
+    // Guardar referencias de botones para navegación
+    this.pauseButtons = [
+      { container: resumeButton, action: () => this.togglePause() },
+      { container: restartButton, action: () => this.restartGame() },
+      { container: exitButton, action: () => this.exitToMenu() }
+    ];
+    
     this.pauseContainer.add([overlay, panel, title, resumeButton, restartButton, exitButton, instruction]);
+    
+    // Aplicar highlight inicial
+    this.updatePauseSelectionHighlight(-1, this.selectedPauseOption);
+    
+    // Configurar callbacks de Bluetooth para el menú de pausa
+    if (this.bluetoothController) {
+      this.pauseBluetoothHandler = (events) => {
+        this.handlePauseBluetoothInput(events);
+      };
+      this.bluetoothController.on('data', this.pauseBluetoothHandler);
+    }
   }
 
   createPauseButton(x, y, text, width, height, callback, color = 0x6c5ce7) {
@@ -1554,6 +1576,12 @@ export default class GameScene extends Phaser.Scene {
     }
     if (this.pauseButtons) {
       this.pauseButtons = [];
+    }
+    
+    // Limpiar callback de Bluetooth del menú de pausa
+    if (this.bluetoothController && this.pauseBluetoothHandler) {
+      this.bluetoothController.off('data', this.pauseBluetoothHandler);
+      this.pauseBluetoothHandler = null;
     }
   }
 
@@ -1663,6 +1691,25 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
     
+    // Navegación en menú de pausa
+    if (this.isPaused && this.pauseContainer) {
+      // Navegación con teclas
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+        this.movePauseSelection(-1);
+      } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
+        this.movePauseSelection(1);
+      }
+      
+      // Confirmar selección
+      if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || 
+          Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER))) {
+        this.confirmPauseSelection();
+      }
+      
+      this.player.body.setVelocity(0);
+      return;
+    }
+    
     if (this.gameOver || this.questionActive || this.isPaused) {
       this.player.body.setVelocity(0);
       return;
@@ -1709,5 +1756,108 @@ export default class GameScene extends Phaser.Scene {
     
     // Limpiar menú de pausa si existe
     this.hidePauseMenu();
+    
+    // Limpiar callback de Bluetooth del InputManager
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+  }
+
+  handlePauseBluetoothInput(events) {
+    if (!events || !this.isPaused) return;
+
+    events.forEach(event => {
+      if (event.type === 'direction' && event.state) {
+        const currentState = event.state;
+        
+        // Navegación ARRIBA
+        if (currentState.up && !this.pauseNavigationCooldown) {
+          this.movePauseSelection(-1);
+          this.startPauseNavigationCooldown();
+        }
+        
+        // Navegación ABAJO
+        if (currentState.down && !this.pauseNavigationCooldown) {
+          this.movePauseSelection(1);
+          this.startPauseNavigationCooldown();
+        }
+        
+      } else if (event.type === 'button') {
+        if (event.key === 'select') {
+          this.confirmPauseSelection();
+        }
+      }
+    });
+  }
+
+  startPauseNavigationCooldown() {
+    this.pauseNavigationCooldown = true;
+    this.time.delayedCall(200, () => {
+      this.pauseNavigationCooldown = false;
+    });
+  }
+
+  movePauseSelection(direction) {
+    const previousOption = this.selectedPauseOption;
+    this.selectedPauseOption += direction;
+
+    // Wrap around
+    if (this.selectedPauseOption < 0) {
+      this.selectedPauseOption = this.pauseButtons.length - 1;
+    } else if (this.selectedPauseOption >= this.pauseButtons.length) {
+      this.selectedPauseOption = 0;
+    }
+
+    // Actualizar visualmente
+    this.updatePauseSelectionHighlight(previousOption, this.selectedPauseOption);
+  }
+
+  updatePauseSelectionHighlight(previousIndex, currentIndex) {
+    if (!this.pauseButtons) return;
+
+    // Quitar highlight del anterior
+    if (previousIndex >= 0 && previousIndex < this.pauseButtons.length) {
+      const prevButton = this.pauseButtons[previousIndex].container;
+      this.tweens.add({
+        targets: prevButton,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 100
+      });
+    }
+
+    // Agregar highlight al actual
+    if (currentIndex >= 0 && currentIndex < this.pauseButtons.length) {
+      const currButton = this.pauseButtons[currentIndex].container;
+      this.tweens.add({
+        targets: currButton,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 100,
+        ease: 'Back.easeOut'
+      });
+    }
+  }
+
+  confirmPauseSelection() {
+    if (!this.pauseButtons || this.selectedPauseOption < 0 || 
+        this.selectedPauseOption >= this.pauseButtons.length) {
+      return;
+    }
+
+    const selectedButton = this.pauseButtons[this.selectedPauseOption];
+    
+    // Animación de confirmación
+    this.tweens.add({
+      targets: selectedButton.container,
+      scaleX: 0.95,
+      scaleY: 0.95,
+      duration: 50,
+      yoyo: true,
+      onComplete: () => {
+        selectedButton.action();
+      }
+    });
   }
 }

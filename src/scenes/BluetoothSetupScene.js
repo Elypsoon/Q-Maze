@@ -8,6 +8,11 @@ export default class BluetoothSetupScene extends Phaser.Scene {
 
   init(data) {
     this.bluetoothController = data.bluetoothController;
+    
+    // Sistema de navegación
+    this.selectedOption = 0; // 0=Conectar, 1=Volver
+    this.navigationCooldown = false;
+    this.navigationRepeatDelay = 200;
   }
 
   create() {
@@ -135,6 +140,18 @@ export default class BluetoothSetupScene extends Phaser.Scene {
       },
       loop: true
     });
+    
+    // Guardar referencias de botones para navegación
+    this.buttons = [
+      { container: this.connectButton, action: () => this.connectBluetooth() },
+      { container: backButton, action: () => this.goBack() }
+    ];
+    
+    // Configurar controles
+    this.setupControls();
+    
+    // Aplicar highlight inicial
+    this.updateSelectionHighlight(-1, this.selectedOption);
 
     // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
@@ -253,6 +270,12 @@ export default class BluetoothSetupScene extends Phaser.Scene {
   }
 
   goBack() {
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
     this.scene.start('MenuScene', { 
       bluetoothController: this.bluetoothController,
       skipAnimations: true
@@ -277,5 +300,148 @@ export default class BluetoothSetupScene extends Phaser.Scene {
     if (this.connectionCheckTimer) {
       this.connectionCheckTimer.remove();
     }
+    
+    // Limpiar callback de Bluetooth
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+    }
+  }
+
+  setupControls() {
+    // Teclas de dirección
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+    // Configurar callbacks del controlador Bluetooth si existe
+    if (this.bluetoothController) {
+      this.bluetoothDataHandler = (events) => {
+        this.handleBluetoothInput(events);
+      };
+      this.bluetoothController.on('data', this.bluetoothDataHandler);
+    }
+  }
+
+  handleBluetoothInput(events) {
+    if (!events) return;
+
+    events.forEach(event => {
+      if (event.type === 'direction' && event.state) {
+        const currentState = event.state;
+        
+        // Navegación ARRIBA
+        if (currentState.up && !this.navigationCooldown) {
+          this.moveSelection(-1);
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación ABAJO
+        if (currentState.down && !this.navigationCooldown) {
+          this.moveSelection(1);
+          this.startNavigationCooldown();
+        }
+        
+      } else if (event.type === 'button') {
+        if (event.key === 'select') {
+          this.confirmSelection();
+        } else if (event.key === 'pause') {
+          this.goBack();
+        }
+      }
+    });
+  }
+
+  startNavigationCooldown() {
+    this.navigationCooldown = true;
+    this.time.delayedCall(this.navigationRepeatDelay, () => {
+      this.navigationCooldown = false;
+    });
+  }
+
+  update() {
+    // Verificar que los controles estén inicializados
+    if (!this.cursors) return;
+    
+    // Navegación con teclas
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+      this.moveSelection(-1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
+      this.moveSelection(1);
+    }
+
+    // Confirmar con SPACE o ENTER
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || 
+        Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.confirmSelection();
+    }
+    
+    // Volver con ESC
+    if (Phaser.Input.Keyboard.JustDown(this.escKey)) {
+      this.goBack();
+    }
+  }
+
+  moveSelection(direction) {
+    const previousOption = this.selectedOption;
+    this.selectedOption += direction;
+
+    // Wrap around
+    if (this.selectedOption < 0) {
+      this.selectedOption = this.buttons.length - 1;
+    } else if (this.selectedOption >= this.buttons.length) {
+      this.selectedOption = 0;
+    }
+
+    // Actualizar visualmente
+    this.updateSelectionHighlight(previousOption, this.selectedOption);
+  }
+
+  updateSelectionHighlight(previousIndex, currentIndex) {
+    if (!this.buttons) return;
+
+    // Quitar highlight del anterior
+    if (previousIndex >= 0 && previousIndex < this.buttons.length) {
+      const prevButton = this.buttons[previousIndex].container;
+      this.tweens.add({
+        targets: prevButton,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 100
+      });
+    }
+
+    // Agregar highlight al actual
+    if (currentIndex >= 0 && currentIndex < this.buttons.length) {
+      const currButton = this.buttons[currentIndex].container;
+      this.tweens.add({
+        targets: currButton,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 100,
+        ease: 'Back.easeOut'
+      });
+    }
+  }
+
+  confirmSelection() {
+    if (!this.buttons || this.selectedOption < 0 || 
+        this.selectedOption >= this.buttons.length) {
+      return;
+    }
+
+    const selectedButton = this.buttons[this.selectedOption];
+    
+    // Animación de confirmación
+    this.tweens.add({
+      targets: selectedButton.container,
+      scaleX: 0.95,
+      scaleY: 0.95,
+      duration: 50,
+      yoyo: true,
+      onComplete: () => {
+        selectedButton.action();
+      }
+    });
   }
 }

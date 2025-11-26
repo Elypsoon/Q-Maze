@@ -24,6 +24,11 @@ export default class MenuScene extends Phaser.Scene {
     
     // Flag para saber si venimos de otra escena (no animar si es true)
     this.skipAnimations = data.skipAnimations || false;
+    
+    // Sistema de navegación
+    this.selectedOption = 0; // 0=JUGAR, 1=Mando, 2=Opciones
+    this.navigationCooldown = false;
+    this.navigationRepeatDelay = 200;
   }
 
   create() {
@@ -42,6 +47,9 @@ export default class MenuScene extends Phaser.Scene {
     }
     
     this.createMenu();
+    
+    // Configurar controles de teclado/mando
+    this.setupControls();
     
     // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
@@ -235,29 +243,16 @@ export default class MenuScene extends Phaser.Scene {
     // Botón de Jugar
     const buttonWidth = Math.min(240, width / 4.5);
     const buttonHeight = Math.min(55, height / 13);
-    const playButton = this.createButton(width / 2, height * 0.68, 'JUGAR', buttonWidth, buttonHeight, () => {
-      // Usar el nombre de la configuración global
-      const playerName = window.gameSettings.playerName;
-      
-      // Detener música del menú
-      if (this.menuMusic) {
-        this.menuMusic.stop();
-      }
-
-      this.scene.start('GameScene', { 
-        seed: Date.now(),
-        bluetoothController: window.bluetoothController,
-        playerName: playerName,
-        difficulty: this.selectedDifficulty
-      });
+    this.playButton = this.createButton(width / 2, height * 0.68, 'JUGAR', buttonWidth, buttonHeight, () => {
+      this.onPlayButtonClick();
     });
     
     // Animación de entrada para el botón de jugar (solo si no se saltan animaciones)
     if (!this.skipAnimations) {
-      playButton.setAlpha(0);
-      playButton.setScale(0.8);
+      this.playButton.setAlpha(0);
+      this.playButton.setScale(0.8);
       this.tweens.add({
-        targets: playButton,
+        targets: this.playButton,
         alpha: 1,
         scaleX: 1,
         scaleY: 1,
@@ -268,28 +263,24 @@ export default class MenuScene extends Phaser.Scene {
     }
     
     // Botón de Bluetooth
-    const bluetoothButton = this.createButton(
+    this.bluetoothButton = this.createButton(
       width / 2, 
       height * 0.76, 
       'Mando', 
       buttonWidth, 
       buttonHeight, 
       () => {
-        this.scene.start('BluetoothSetupScene', { 
-          bluetoothController: window.bluetoothController,
-          difficulty: this.selectedDifficulty,
-          playerName: window.gameSettings.playerName
-        });
+        this.onBluetoothButtonClick();
       },
       0x9b59b6
     );
     
     // Animación de entrada para el botón de Bluetooth (solo si no se saltan animaciones)
     if (!this.skipAnimations) {
-      bluetoothButton.setAlpha(0);
-      bluetoothButton.setScale(0.8);
+      this.bluetoothButton.setAlpha(0);
+      this.bluetoothButton.setScale(0.8);
       this.tweens.add({
-        targets: bluetoothButton,
+        targets: this.bluetoothButton,
         alpha: 1,
         scaleX: 1,
         scaleY: 1,
@@ -300,27 +291,24 @@ export default class MenuScene extends Phaser.Scene {
     }
     
     // Botón de Opciones
-    const optionsButton = this.createButton(
+    this.optionsButton = this.createButton(
       width / 2,
       height * 0.84,
       'Opciones',
       buttonWidth,
       buttonHeight,
       () => {
-        this.scene.start('OptionsScene', {
-          bluetoothController: window.bluetoothController,
-          difficulty: this.selectedDifficulty
-        });
+        this.onOptionsButtonClick();
       },
       0xe67e22
     );
     
     // Animación de entrada para el botón de opciones (solo si no se saltan animaciones)
     if (!this.skipAnimations) {
-      optionsButton.setAlpha(0);
-      optionsButton.setScale(0.8);
+      this.optionsButton.setAlpha(0);
+      this.optionsButton.setScale(0.8);
       this.tweens.add({
-        targets: optionsButton,
+        targets: this.optionsButton,
         alpha: 1,
         scaleX: 1,
         scaleY: 1,
@@ -330,6 +318,13 @@ export default class MenuScene extends Phaser.Scene {
       });
     }
 
+    // Guardar referencia a botones principales para navegación
+    this.mainButtons = [
+      { container: this.playButton, action: () => this.onPlayButtonClick() },
+      { container: this.bluetoothButton, action: () => this.onBluetoothButtonClick() },
+      { container: this.optionsButton, action: () => this.onOptionsButtonClick() }
+    ];
+    
     this.menuContainer.add([
       title,
       subtitle,
@@ -338,10 +333,13 @@ export default class MenuScene extends Phaser.Scene {
       this.easyButton,
       this.mediumButton,
       this.hardButton,
-      playButton,
-      bluetoothButton,
-      optionsButton
+      this.playButton,
+      this.bluetoothButton,
+      this.optionsButton
     ]);
+    
+    // Aplicar highlight inicial al primer botón
+    this.updateMenuSelectionHighlight(-1, this.selectedOption);
 
     // Crear partículas de fondo para darle vida
     this.createBackgroundParticles(width, height);
@@ -401,6 +399,12 @@ export default class MenuScene extends Phaser.Scene {
     
     // Limpiar input HTML
     this.cleanupNameInput();
+    
+    // Limpiar callback de Bluetooth
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      console.log('🎮 MenuScene: Callback Bluetooth eliminado');
+    }
   }
 
   createButton(x, y, text, width, height, callback, color = 0x6c5ce7) {
@@ -591,5 +595,213 @@ export default class MenuScene extends Phaser.Scene {
     if (this.difficultyDescription) {
       this.difficultyDescription.setText(selectedConfig.DIFFICULTY_DESCRIPTION);
     }
+  }
+
+  setupControls() {
+    // Teclas de dirección
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+
+    // Configurar callbacks del controlador Bluetooth si existe
+    if (this.bluetoothController) {
+      this.bluetoothDataHandler = (events) => {
+        this.handleBluetoothInput(events);
+      };
+      this.bluetoothController.on('data', this.bluetoothDataHandler);
+    }
+  }
+
+  handleBluetoothInput(events) {
+    if (!events) return;
+
+    events.forEach(event => {
+      if (event.type === 'direction' && event.state) {
+        const currentState = event.state;
+        
+        // Navegación ARRIBA - con cooldown
+        if (currentState.up && !this.navigationCooldown) {
+          this.moveMenuSelection(-1);
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación ABAJO - con cooldown
+        if (currentState.down && !this.navigationCooldown) {
+          this.moveMenuSelection(1);
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación IZQUIERDA - cambiar dificultad
+        if (currentState.left && !this.navigationCooldown) {
+          this.changeDifficulty(-1);
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación DERECHA - cambiar dificultad
+        if (currentState.right && !this.navigationCooldown) {
+          this.changeDifficulty(1);
+          this.startNavigationCooldown();
+        }
+        
+      } else if (event.type === 'button') {
+        if (event.key === 'select') {
+          this.confirmMenuSelection();
+        }
+      }
+    });
+  }
+
+  startNavigationCooldown() {
+    this.navigationCooldown = true;
+    this.time.delayedCall(this.navigationRepeatDelay, () => {
+      this.navigationCooldown = false;
+    });
+  }
+
+  update() {
+    // Verificar que los controles estén inicializados
+    if (!this.cursors) return;
+    
+    // Navegación con teclas de dirección
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+      this.moveMenuSelection(-1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
+      this.moveMenuSelection(1);
+    }
+    
+    // Navegación horizontal para cambiar dificultad
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      this.changeDifficulty(-1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      this.changeDifficulty(1);
+    }
+
+    // Confirmar con SPACE o ENTER
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || 
+        Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.confirmMenuSelection();
+    }
+  }
+
+  moveMenuSelection(direction) {
+    const previousOption = this.selectedOption;
+    this.selectedOption += direction;
+
+    // Wrap around
+    if (this.selectedOption < 0) {
+      this.selectedOption = this.mainButtons.length - 1;
+    } else if (this.selectedOption >= this.mainButtons.length) {
+      this.selectedOption = 0;
+    }
+
+    // Actualizar visualmente
+    this.updateMenuSelectionHighlight(previousOption, this.selectedOption);
+  }
+
+  updateMenuSelectionHighlight(previousIndex, currentIndex) {
+    // Quitar highlight del anterior
+    if (previousIndex >= 0 && previousIndex < this.mainButtons.length) {
+      const prevButton = this.mainButtons[previousIndex].container;
+      this.tweens.add({
+        targets: prevButton,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 100
+      });
+    }
+
+    // Agregar highlight al actual
+    if (currentIndex >= 0 && currentIndex < this.mainButtons.length) {
+      const currButton = this.mainButtons[currentIndex].container;
+      this.tweens.add({
+        targets: currButton,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 100,
+        ease: 'Back.easeOut'
+      });
+    }
+  }
+
+  confirmMenuSelection() {
+    if (this.selectedOption >= 0 && this.selectedOption < this.mainButtons.length) {
+      const selectedButton = this.mainButtons[this.selectedOption];
+      
+      // Animación de confirmación
+      this.tweens.add({
+        targets: selectedButton.container,
+        scaleX: 0.95,
+        scaleY: 0.95,
+        duration: 50,
+        yoyo: true,
+        onComplete: () => {
+          selectedButton.action();
+        }
+      });
+    }
+  }
+
+  onPlayButtonClick() {
+    const playerName = window.gameSettings.playerName;
+    
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
+    // Detener música del menú
+    if (this.menuMusic) {
+      this.menuMusic.stop();
+    }
+
+    this.scene.start('GameScene', { 
+      seed: Date.now(),
+      bluetoothController: window.bluetoothController,
+      playerName: playerName,
+      difficulty: this.selectedDifficulty
+    });
+  }
+
+  onBluetoothButtonClick() {
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
+    this.scene.start('BluetoothSetupScene', { 
+      bluetoothController: window.bluetoothController,
+      difficulty: this.selectedDifficulty,
+      playerName: window.gameSettings.playerName
+    });
+  }
+
+  onOptionsButtonClick() {
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
+    this.scene.start('OptionsScene', {
+      bluetoothController: window.bluetoothController,
+      difficulty: this.selectedDifficulty
+    });
+  }
+
+  changeDifficulty(direction) {
+    const difficulties = [DIFFICULTY_LEVELS.EASY, DIFFICULTY_LEVELS.MEDIUM, DIFFICULTY_LEVELS.HARD];
+    const currentIndex = difficulties.indexOf(this.selectedDifficulty);
+    let newIndex = currentIndex + direction;
+
+    // Wrap around
+    if (newIndex < 0) {
+      newIndex = difficulties.length - 1;
+    } else if (newIndex >= difficulties.length) {
+      newIndex = 0;
+    }
+
+    this.selectDifficulty(difficulties[newIndex]);
   }
 }

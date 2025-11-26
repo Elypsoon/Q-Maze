@@ -27,6 +27,10 @@ export default class OptionsScene extends Phaser.Scene {
     
     this.categories = ['all']; // Inicializar con "Todas"
     this.loadingCategories = true;
+    
+    // Sistema de navegación
+    this.navigationCooldown = false;
+    this.navigationRepeatDelay = 200;
   }
 
   async create() {
@@ -63,6 +67,9 @@ export default class OptionsScene extends Phaser.Scene {
 
     // Botón Volver
     this.createBackButton(width, height);
+    
+    // Configurar controles de teclado/mando
+    this.setupControls();
 
     // Escuchar cambios de tamaño
     this.scale.on('resize', this.resize, this);
@@ -450,7 +457,7 @@ export default class OptionsScene extends Phaser.Scene {
     const buttonHeight = Math.min(50, height / 15);
     const buttonY = height * 0.88;
 
-    const button = this.add.container(width / 2, buttonY);
+    this.backButton = this.add.container(width / 2, buttonY);
     
     const bg = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x27ae60);
     bg.setStrokeStyle(3, 0xffffff);
@@ -462,33 +469,33 @@ export default class OptionsScene extends Phaser.Scene {
     });
     text.setOrigin(0.5);
     
-    button.add([bg, text]);
-    button.setSize(buttonWidth, buttonHeight);
-    button.setInteractive({ useHandCursor: true });
+    this.backButton.add([bg, text]);
+    this.backButton.setSize(buttonWidth, buttonHeight);
+    this.backButton.setInteractive({ useHandCursor: true });
     
-    button.on('pointerover', () => {
+    this.backButton.on('pointerover', () => {
       bg.setFillStyle(0x229954);
       this.tweens.add({
-        targets: button,
+        targets: this.backButton,
         scaleX: 1.05,
         scaleY: 1.05,
         duration: 100
       });
     });
     
-    button.on('pointerout', () => {
+    this.backButton.on('pointerout', () => {
       bg.setFillStyle(0x27ae60);
       this.tweens.add({
-        targets: button,
+        targets: this.backButton,
         scaleX: 1,
         scaleY: 1,
         duration: 100
       });
     });
     
-    button.on('pointerdown', () => {
+    this.backButton.on('pointerdown', () => {
       this.tweens.add({
-        targets: button,
+        targets: this.backButton,
         scaleX: 0.95,
         scaleY: 0.95,
         duration: 50,
@@ -519,5 +526,98 @@ export default class OptionsScene extends Phaser.Scene {
   shutdown() {
     this.cleanupNameInput();
     this.scale.off('resize', this.resize, this);
+    
+    // Limpiar callback de Bluetooth
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+    }
+  }
+
+  setupControls() {
+    // Teclas de dirección y confirmación
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+    // Configurar callbacks del controlador Bluetooth si existe
+    if (this.bluetoothController) {
+      this.bluetoothDataHandler = (events) => {
+        this.handleBluetoothInput(events);
+      };
+      this.bluetoothController.on('data', this.bluetoothDataHandler);
+    }
+  }
+
+  handleBluetoothInput(events) {
+    if (!events) return;
+
+    events.forEach(event => {
+      if (event.type === 'direction' && event.state) {
+        const currentState = event.state;
+        
+        // Navegación IZQUIERDA - disminuir volumen
+        if (currentState.left && !this.navigationCooldown) {
+          this.adjustVolume(-0.1);
+          this.startNavigationCooldown();
+        }
+        
+        // Navegación DERECHA - aumentar volumen
+        if (currentState.right && !this.navigationCooldown) {
+          this.adjustVolume(0.1);
+          this.startNavigationCooldown();
+        }
+        
+      } else if (event.type === 'button') {
+        if (event.key === 'select' || event.key === 'pause') {
+          this.goBack();
+        }
+      }
+    });
+  }
+
+  startNavigationCooldown() {
+    this.navigationCooldown = true;
+    this.time.delayedCall(this.navigationRepeatDelay, () => {
+      this.navigationCooldown = false;
+    });
+  }
+
+  update() {
+    // Verificar que los controles estén inicializados
+    if (!this.cursors) return;
+    
+    // Control de volumen con flechas
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      this.adjustVolume(-0.1);
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      this.adjustVolume(0.1);
+    }
+
+    // Volver con ESC, SPACE o ENTER
+    if (Phaser.Input.Keyboard.JustDown(this.escKey) ||
+        Phaser.Input.Keyboard.JustDown(this.spaceKey) ||
+        Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.goBack();
+    }
+  }
+
+  adjustVolume(change) {
+    this.setVolume(this.volume + change);
+  }
+
+  goBack() {
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
+    this.cleanupNameInput();
+    this.scene.start('MenuScene', {
+      bluetoothController: this.bluetoothController,
+      difficulty: this.difficulty,
+      skipAnimations: true
+    });
   }
 }

@@ -41,6 +41,9 @@ export default class OptionsScene extends Phaser.Scene {
     const graphics = this.add.graphics();
     graphics.fillGradientStyle(0x0f0c29, 0x302b63, 0x24243e, 0x302b63, 1);
     graphics.fillRect(0, 0, width, height);
+    
+    // Crear partículas de fondo
+    this.createBackgroundParticles(width, height);
 
     // Título
     const titleSize = Math.min(64, width / 15);
@@ -89,6 +92,30 @@ export default class OptionsScene extends Phaser.Scene {
       console.error('Error al cargar categorías:', error);
     }
     this.loadingCategories = false;
+  }
+
+  createBackgroundParticles(width, height) {
+    // Crear textura para partículas si no existe
+    if (!this.textures.exists('particle')) {
+      const particleGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+      particleGraphics.fillStyle(0xffffff, 1);
+      particleGraphics.fillCircle(4, 4, 4);
+      particleGraphics.generateTexture('particle', 8, 8);
+    }
+
+    // Partículas de fondo
+    const particles = this.add.particles(0, 0, 'particle', {
+      x: { min: 0, max: width },
+      y: { min: 0, max: height },
+      quantity: 2,
+      frequency: 100,
+      lifespan: 4000,
+      gravityY: -10,
+      speed: { min: 10, max: 30 },
+      scale: { start: 0.5, end: 0 },
+      alpha: { start: 0.4, end: 0 },
+      blendMode: 'ADD'
+    });
   }
 
   createVolumeSection(width, height) {

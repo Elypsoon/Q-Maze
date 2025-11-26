@@ -5,6 +5,7 @@ import OptionsScene from "./scenes/OptionsScene";
 import GameScene from "./scenes/GameScene";
 import QuestionScene from "./scenes/QuestionScene";
 import BluetoothSetupScene from "./scenes/BluetoothSetupScene";
+import HistoryScene from "./scenes/HistoryScene";
 import BluetoothController from "./services/BluetoothController";
 
 // Crear instancia global del controlador Bluetooth
@@ -21,7 +22,7 @@ const config = {
     // Obtiene la mejor resolución posible según el dispositivo
     resolution: Math.max(2, window.devicePixelRatio || 2),
   },
-  scene: [PreloadScene, MenuScene, OptionsScene, GameScene, QuestionScene, BluetoothSetupScene],
+  scene: [PreloadScene, MenuScene, OptionsScene, GameScene, QuestionScene, BluetoothSetupScene, HistoryScene],
   physics: {
     default: "arcade",
     arcade: {

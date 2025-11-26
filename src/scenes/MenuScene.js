@@ -26,7 +26,7 @@ export default class MenuScene extends Phaser.Scene {
     this.skipAnimations = data.skipAnimations || false;
     
     // Sistema de navegación
-    this.selectedOption = 0; // 0=JUGAR, 1=Mando, 2=Opciones
+    this.selectedOption = 0; // 0=JUGAR, 1=Mando, 2=Opciones, 3=Historial
     this.navigationCooldown = false;
     this.navigationRepeatDelay = 200;
   }
@@ -317,12 +317,41 @@ export default class MenuScene extends Phaser.Scene {
         ease: 'Back.easeOut'
       });
     }
+    
+    // Botón de Historial
+    this.historyButton = this.createButton(
+      width / 2,
+      height * 0.92,
+      'Historial',
+      buttonWidth,
+      buttonHeight,
+      () => {
+        this.onHistoryButtonClick();
+      },
+      0x16a085
+    );
+    
+    // Animación de entrada para el botón de historial (solo si no se saltan animaciones)
+    if (!this.skipAnimations) {
+      this.historyButton.setAlpha(0);
+      this.historyButton.setScale(0.8);
+      this.tweens.add({
+        targets: this.historyButton,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 400,
+        delay: 1000,
+        ease: 'Back.easeOut'
+      });
+    }
 
     // Guardar referencia a botones principales para navegación
     this.mainButtons = [
       { container: this.playButton, action: () => this.onPlayButtonClick() },
       { container: this.bluetoothButton, action: () => this.onBluetoothButtonClick() },
-      { container: this.optionsButton, action: () => this.onOptionsButtonClick() }
+      { container: this.optionsButton, action: () => this.onOptionsButtonClick() },
+      { container: this.historyButton, action: () => this.onHistoryButtonClick() }
     ];
     
     this.menuContainer.add([
@@ -335,7 +364,8 @@ export default class MenuScene extends Phaser.Scene {
       this.hardButton,
       this.playButton,
       this.bluetoothButton,
-      this.optionsButton
+      this.optionsButton,
+      this.historyButton
     ]);
     
     // Aplicar highlight inicial al primer botón
@@ -785,6 +815,19 @@ export default class MenuScene extends Phaser.Scene {
     }
     
     this.scene.start('OptionsScene', {
+      bluetoothController: window.bluetoothController,
+      difficulty: this.selectedDifficulty
+    });
+  }
+
+  onHistoryButtonClick() {
+    // Limpiar callbacks antes de cambiar de escena
+    if (this.bluetoothController && this.bluetoothDataHandler) {
+      this.bluetoothController.off('data', this.bluetoothDataHandler);
+      this.bluetoothDataHandler = null;
+    }
+    
+    this.scene.start('HistoryScene', {
       bluetoothController: window.bluetoothController,
       difficulty: this.selectedDifficulty
     });
